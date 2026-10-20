@@ -92,15 +92,21 @@ function md(src) {
           + `<tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
         continue;
       }
-      if (/^\s*[-*]\s/.test(ln)) {
-        let buf = [];
-        while (i < lines.length && /^\s*[-*]\s/.test(lines[i])) { buf.push(`<li>${inline(lines[i].replace(/^\s*[-*]\s/, ""))}</li>`); i++; }
-        out.push(`<ul>${buf.join("")}</ul>`); continue;
-      }
+      // Listas: una línea sangrada bajo un ítem (texto partido en el .md) sigue
+      // perteneciendo a ese ítem, en vez de cortar la lista y reiniciar la numeración.
+      const list = (marker) => {
+        const buf = [];
+        while (i < lines.length && marker.test(lines[i])) {
+          let item = lines[i++].replace(marker, "");
+          while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !/^\s*([-*]|\d+\.)\s/.test(lines[i])) item += " " + lines[i++].trim();
+          buf.push(`<li>${inline(item)}</li>`);
+        }
+        return buf.join("");
+      };
+      if (/^\s*[-*]\s/.test(ln)) { out.push(`<ul>${list(/^\s*[-*]\s/)}</ul>`); continue; }
       if (/^\s*\d+\.\s/.test(ln)) {
-        let buf = [];
-        while (i < lines.length && /^\s*\d+\.\s/.test(lines[i])) { buf.push(`<li>${inline(lines[i].replace(/^\s*\d+\.\s/, ""))}</li>`); i++; }
-        out.push(`<ol>${buf.join("")}</ol>`); continue;
+        const start = parseInt(ln, 10);
+        out.push(`<ol${start > 1 ? ` start="${start}"` : ""}>${list(/^\s*\d+\.\s/)}</ol>`); continue;
       }
       if (ln.trim() === "") { i++; continue; }
       // la primera línea se consume siempre: una línea que ningún bloque reconoce
@@ -345,6 +351,22 @@ async function guardedAction(l, action) {
 const cursoById = (id) => STATE.cursos.find((c) => c.id === id);
 const labsForCurso = (id) => STATE.labs.filter((l) => (l.cursos || []).includes(id));
 
+/* La URL refleja la vista (#cursos, #curso/NN, #lab/NN) para poder enlazarla,
+   recargar sin perderla y usar atrás/adelante. pushState no dispara hashchange. */
+function setHash(h) {
+  if ((location.hash || "") === h) return;
+  history.pushState(null, "", h || location.pathname + location.search);
+}
+
+function route() {
+  const h = location.hash;
+  let m;
+  if (h === "#cursos") renderCourses();
+  else if ((m = h.match(/^#curso\/(\d{2})$/))) renderCourse(m[1]);
+  else if ((m = h.match(/^#lab\/(\d{2})$/))) renderDetail(m[1]);
+  else renderHome();
+}
+
 /* Resalta en el nav "Cursos" o el filtro de pista activo. */
 function setNav(section) {
   document.querySelectorAll(".chip[data-filter]").forEach((x) =>
@@ -364,6 +386,7 @@ function helpHTML(l) {
 
 function renderCourses() {
   STATE.view = "cursos";
+  setHash("#cursos");
   setNav("cursos");
   window.scrollTo(0, 0);
   const cards = STATE.cursos.map((c) => {
@@ -398,6 +421,7 @@ async function renderCourse(id) {
   const c = cursoById(id);
   if (!c) return renderCourses();
   STATE.view = "curso:" + id;
+  setHash("#curso/" + id);
   setNav("cursos");
   window.scrollTo(0, 0);
   const i = STATE.cursos.indexOf(c);
@@ -422,6 +446,7 @@ async function renderCourse(id) {
 
 function renderHome() {
   STATE.view = "home";
+  setHash("");
   setNav("home");
   const labs = STATE.labs.filter((l) => STATE.filter === "all" || l.track === STATE.filter);
   const byTrack = { A: [], B: [], C: [] };
@@ -455,6 +480,7 @@ async function renderDetail(id) {
   const l = STATE.labs.find((x) => x.id === id);
   if (!l) return renderHome();
   STATE.view = id;
+  setHash("#lab/" + id);
   setNav("home");
   window.scrollTo(0, 0);
 
@@ -613,16 +639,8 @@ function initFilters() {
     renderHome();
   }));
   document.querySelector('.chip[data-route="cursos"]').addEventListener("click", renderCourses);
-  // Enlaces internos del markdown y de las vistas: #cursos, #curso/NN, #lab/NN.
-  document.addEventListener("click", (e) => {
-    const a = e.target.closest('a[href^="#"]');
-    if (!a) return;
-    const h = a.getAttribute("href");
-    let m;
-    if (h === "#cursos") { e.preventDefault(); renderCourses(); }
-    else if ((m = h.match(/^#curso\/(\d{2})$/))) { e.preventDefault(); renderCourse(m[1]); }
-    else if ((m = h.match(/^#lab\/(\d{2})$/))) { e.preventDefault(); renderDetail(m[1]); }
-  });
+  // Enlaces internos (#cursos, #curso/NN, #lab/NN) y botones atrás/adelante.
+  window.addEventListener("hashchange", route);
   document.querySelector(".brand").addEventListener("click", (e) => { e.preventDefault(); renderHome(); });
   document.getElementById("runIndicator").addEventListener("click", () => {
     if (STATE.view !== "home") renderHome();
@@ -646,7 +664,7 @@ async function boot() {
     ]);
     STATE.labs = d.labs;
     STATE.cursos = c.cursos || [];
-    renderHome();
+    route(); // abre directamente la vista de la URL (p.ej. /#cursos)
     initPolling();
   } catch (e) {
     view.innerHTML = `<div class="empty">No se pudo contactar el backend. ¿Corriste <code>python3 server.py</code>?<br><small>${esc(e.message)}</small></div>`;
