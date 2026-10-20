@@ -1,0 +1,20 @@
+name: shop
+
+services:
+  shop:
+    image: shop/app:1.0
+    build: ./app
+    environment:
+      ROLE: shop
+    ports:
+      - "8080:8080"   # web pública
+      - "9100:9100"   # métricas (para que el scraper las vea)
+    restart: unless-stopped
+
+  scraper:
+    image: shop/app:1.0
+    environment:
+      ROLE: scraper
+    depends_on:
+      - shop
+    restart: unless-stopped

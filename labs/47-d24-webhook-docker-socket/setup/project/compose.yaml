@@ -1,0 +1,12 @@
+name: deployhook
+
+services:
+  webhook:
+    image: deployhook/webhook:1.2
+    build: ./webhook
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./events:/events
+      - /var/run/docker.sock:/var/run/docker.sock   # "para poder reiniciar cosas en el futuro"
+    restart: unless-stopped

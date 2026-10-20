@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TerminalCero Lab</title>
+  <meta name="description" content="Laboratorio local de DevSecOps: detección, respuesta y hardening en Linux.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="nav">
+    <div class="nav__inner">
+      <a class="brand" href="#" data-route="home" aria-label="Inicio">
+        <span class="brand__mark" aria-hidden="true">▲</span>
+        <span class="brand__name">TerminalCero<span class="brand__dim"> Lab</span></span>
+      </a>
+      <nav class="nav__links" aria-label="Pistas">
+        <button class="chip" data-filter="all" aria-pressed="true">Todos</button>
+        <button class="chip" data-filter="A">Detección</button>
+        <button class="chip" data-filter="B">Hardening</button>
+        <button class="chip" data-filter="C">30 días</button>
+        <span class="nav__sep" aria-hidden="true"></span>
+        <button class="chip" data-route="cursos" aria-pressed="false">Cursos</button>
+      </nav>
+      <button class="badge live run-indicator" id="runIndicator" hidden aria-label="Ver labs en ejecución"></button>
+      <button class="icon-btn" id="themeToggle" aria-label="Cambiar tema">◐</button>
+    </div>
+  </header>
+
+  <main class="container" id="view"><!-- render JS --></main>
+
+  <footer class="foot">
+    <span>Material de estudio derivado del canal <strong>Terminal Cero</strong>. Todo local e inofensivo.</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

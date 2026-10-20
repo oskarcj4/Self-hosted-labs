@@ -1,0 +1,11 @@
+name: portal
+
+services:
+  app:
+    image: portal/app:5.0
+    build: ./app
+    environment:
+      ADMIN_KEY: ${ADMIN_KEY:?define ADMIN_KEY en .env}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

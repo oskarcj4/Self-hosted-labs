@@ -1,0 +1,9 @@
+name: media
+
+services:
+  thumbnailer:
+    image: media/thumbnailer:1.0
+    build: ./thumbnailer
+    volumes:
+      - ./jobs:/jobs
+    restart: unless-stopped

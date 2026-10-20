@@ -1,0 +1,11 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-21
+    hostname: web-21
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:8443:8443"   # HTTPS (opcional, para probar desde tu navegador/curl)
+      - "127.0.0.1:7621:7681"   # terminal web (ttyd)

@@ -1,0 +1,22 @@
+name: inventory
+
+services:
+  app:
+    image: inventory/app:2.0
+    build: ./app
+    environment:
+      ROLE: app
+      DB_HOST: db
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: inventory/app:2.0
+    environment:
+      ROLE: db
+    ports:
+      - "5432:5432"   # para conectar con el cliente SQL durante la migración
+    restart: unless-stopped

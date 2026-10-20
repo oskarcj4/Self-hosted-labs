@@ -1,0 +1,15 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-06
+    hostname: svc-prod-06
+    # systemd como PID 1 necesita estos permisos dentro del contenedor.
+    privileged: true
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7606:7681"   # terminal web (ttyd)

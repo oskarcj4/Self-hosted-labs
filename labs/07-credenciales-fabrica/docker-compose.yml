@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-07
+    hostname: iot-gw-07
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7607:7681"   # terminal web (ttyd)

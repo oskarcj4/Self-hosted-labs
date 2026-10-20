@@ -1,0 +1,12 @@
+# Ejemplo para /etc/wireguard/wg0.conf (para usar con: wg-quick up wg0)
+# Rellena <TU_CLAVE_PRIVADA> y <CLAVE_PUBLICA_DE_SERVERB> (cat /shared/peer.pub).
+
+[Interface]
+Address = 10.8.0.1/24
+PrivateKey = <TU_CLAVE_PRIVADA>
+
+[Peer]
+PublicKey = <CLAVE_PUBLICA_DE_SERVERB>
+Endpoint = peer:51820
+AllowedIPs = 10.8.0.2/32
+PersistentKeepalive = 15

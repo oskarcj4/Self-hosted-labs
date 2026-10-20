@@ -1,0 +1,41 @@
+name: handoff
+
+services:
+  web:
+    image: handoff/app:1.0
+    environment:
+      ROLE: web
+    ports:
+      - "8080:8080"
+    networks: [frontend]
+    depends_on: [api]
+
+  api:
+    image: handoff/app:1.0
+    environment:
+      ROLE: api
+    networks: [frontend, backend]
+    volumes:
+      - reports:/srv/reports
+    depends_on: [db]
+
+  worker:
+    image: handoff/app:1.0
+    environment:
+      ROLE: worker
+    networks: [backend]
+    volumes:
+      - reports:/srv/reports
+
+  db:
+    image: handoff/app:1.0
+    environment:
+      ROLE: db
+    networks: [backend]
+
+networks:
+  frontend: {}
+  backend: {}
+
+volumes:
+  reports: {}

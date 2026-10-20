@@ -1,0 +1,11 @@
+name: edge
+
+services:
+  gateway:
+    image: edge/gateway:3.1
+    build: ./gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/etc/gateway
+    restart: unless-stopped

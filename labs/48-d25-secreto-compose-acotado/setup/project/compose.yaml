@@ -1,0 +1,36 @@
+name: analytics
+
+x-app: &app
+  image: analytics/app:1.0
+  restart: unless-stopped
+  secrets:
+    - api_token
+
+services:
+  upstream:
+    image: analytics/app:1.0
+    build: ./app
+    environment:
+      ROLE: upstream
+    restart: unless-stopped
+
+  web:
+    <<: *app
+    environment:
+      ROLE: web
+    ports:
+      - "8080:8080"
+
+  worker:
+    <<: *app
+    environment:
+      ROLE: worker
+
+  reporter:
+    <<: *app
+    environment:
+      ROLE: reporter
+
+secrets:
+  api_token:
+    file: ./secrets/api_token.txt

@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-05
+    hostname: auth-prod-05
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7605:7681"   # terminal web (ttyd)

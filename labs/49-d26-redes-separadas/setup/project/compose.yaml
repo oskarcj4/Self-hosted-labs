@@ -1,0 +1,23 @@
+name: store
+
+services:
+  web:
+    image: store/app:1.0
+    build: ./app
+    environment:
+      ROLE: web
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  api:
+    image: store/app:1.0
+    environment:
+      ROLE: api
+    restart: unless-stopped
+
+  db:
+    image: store/app:1.0
+    environment:
+      ROLE: db
+    restart: unless-stopped

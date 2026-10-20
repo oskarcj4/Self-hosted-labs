@@ -1,0 +1,13 @@
+name: logs
+
+services:
+  collector:
+    image: logs/collector:0.9
+    build: ./collector
+    # Copiado de un ejemplo de internet: "si no, no puede ajustar el kernel"
+    privileged: true
+    command: sh -c "sysctl -w net.core.somaxconn=1024 && exec python -u collector.py"
+    volumes:
+      - ./logs:/logs:ro
+      - ./out:/out
+    restart: unless-stopped

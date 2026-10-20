@@ -1,0 +1,12 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-18
+    hostname: fw-18
+    tty: true
+    stdin_open: true
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "127.0.0.1:7618:7681"   # terminal web (ttyd)

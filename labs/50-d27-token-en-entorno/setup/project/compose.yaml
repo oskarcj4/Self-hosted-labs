@@ -1,0 +1,16 @@
+name: files
+
+services:
+  storage:
+    image: files/app:1.0
+    build: ./app
+    environment:
+      ROLE: storage
+    restart: unless-stopped
+
+  uploader:
+    image: files/app:1.0
+    environment:
+      ROLE: uploader
+      UPLOADER_API_TOKEN: upl_live_7d3e91c4a0f2
+    restart: unless-stopped

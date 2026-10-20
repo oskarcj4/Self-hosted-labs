@@ -1,0 +1,11 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-01
+    hostname: prod-web-01
+    # El escenario vive sólo en memoria; reset lo re-planta limpio.
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7601:7681"   # terminal web (ttyd)

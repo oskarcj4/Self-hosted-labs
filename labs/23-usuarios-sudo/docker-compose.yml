@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-23
+    hostname: ops-23
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7623:7681"   # terminal web (ttyd)

@@ -1,0 +1,15 @@
+name: notify
+
+services:
+  gateway:
+    image: notify/gateway:1.0
+    environment:
+      ROLE: gateway
+    restart: unless-stopped
+
+  notifier:
+    image: notify/app:1.0
+    build: ./app
+    environment:
+      ROLE: notifier
+    restart: unless-stopped

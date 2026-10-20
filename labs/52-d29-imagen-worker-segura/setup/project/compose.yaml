@@ -1,0 +1,9 @@
+name: reports
+
+services:
+  worker:
+    image: reports/worker:latest
+    build: ./app
+    volumes:
+      - ./out:/out
+    restart: unless-stopped

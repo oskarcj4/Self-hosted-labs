@@ -1,0 +1,11 @@
+[Unit]
+Description=TerminalCero Lab 06 setup
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/lab/plant.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

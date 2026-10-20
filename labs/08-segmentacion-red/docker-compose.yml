@@ -1,0 +1,13 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-08
+    hostname: edge-08
+    tty: true
+    stdin_open: true
+    # iptables necesita manipular el firewall de red del contenedor.
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "127.0.0.1:7608:7681"   # terminal web (ttyd)

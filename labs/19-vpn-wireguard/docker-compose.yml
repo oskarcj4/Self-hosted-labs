@@ -1,0 +1,31 @@
+services:
+  lab:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tc-lab-19
+    hostname: serverA
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - wgshared:/shared
+    depends_on:
+      - peer
+    ports:
+      - "127.0.0.1:7619:7681"   # terminal web (ttyd)
+
+  peer:
+    build:
+      context: .
+      dockerfile: Dockerfile.peer
+    container_name: tc-lab-19-peer
+    hostname: serverB
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - wgshared:/shared
+
+volumes:
+  wgshared:

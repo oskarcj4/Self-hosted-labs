@@ -1,0 +1,12 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-20
+    hostname: ssh-20
+    tty: true
+    stdin_open: true
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "127.0.0.1:7620:7681"   # terminal web (ttyd)

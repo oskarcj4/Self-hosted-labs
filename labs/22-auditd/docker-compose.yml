@@ -1,0 +1,12 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-22
+    hostname: audit-22
+    # auditd necesita el subsistema audit del kernel.
+    privileged: true
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7622:7681"   # terminal web (ttyd)

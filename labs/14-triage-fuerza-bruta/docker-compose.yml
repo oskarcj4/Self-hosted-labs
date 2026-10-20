@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-14
+    hostname: bastion-14
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7614:7681"   # terminal web (ttyd)

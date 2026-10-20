@@ -1,0 +1,10 @@
+name: billing
+
+services:
+  api:
+    image: billing/api:1.4
+    build: ./app
+    ports:
+      - "8000:8000"   # API pública
+      - "5555:5555"   # consola de depuración (la usa soporte desde este servidor)
+    restart: unless-stopped

@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-17
+    hostname: ssh-17
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7617:7681"   # terminal web (ttyd)

@@ -1,0 +1,10 @@
+[Unit]
+Description=ttyd web terminal (lab)
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/ttyd -p 7681 -W -t fontSize=14 bash -lc 'su - analista'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

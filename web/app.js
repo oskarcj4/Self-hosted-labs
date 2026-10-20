@@ -1,0 +1,656 @@
+/* TerminalCero Lab — frontend (JS vanilla). SPA mínima: lista + detalle. */
+"use strict";
+
+const view = document.getElementById("view");
+const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)" };
+let STATE = { labs: [], cursos: [], filter: "all", view: "home" };
+const POLL_MS = 8000; // refresco de "labs en ejecución"
+
+/* ---------- utilidades ---------- */
+const esc = (s) => s.replace(/[&<>"']/g, (c) => (
+  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function api(path, method = "GET") {
+  const r = await fetch(path, { method });
+  if (!r.ok && r.status >= 500) throw new Error("backend " + r.status);
+  return r.json();
+}
+
+/* 75 -> "1 min 15 s", 7300 -> "2 h 1 min" */
+function fmtSecs(s) {
+  if (s == null) return "";
+  if (s < 60) return `${s} s`;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  if (h) return `${h} h ${m} min`;
+  return r ? `${m} min ${r} s` : `${m} min`;
+}
+
+let toastTimer;
+function toast(msg) {
+  let el = document.querySelector(".toast");
+  if (!el) { el = document.createElement("div"); el.className = "toast"; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2600);
+}
+
+/* ---------- markdown mínimo ---------- */
+const mdInline = (t) => esc(t)
+  .replace(/`([^`]+)`/g, "<code>$1</code>")
+  .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+  .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, txt, href) => href.startsWith("#")
+    ? `<a href="${href}">${txt}</a>`   // enlace interno (#curso/NN, #lab/NN)
+    : `<a href="${href}" target="_blank" rel="noopener">${txt}</a>`);
+
+/* Además del markdown básico: bloques ":::tipo Título" … ":::" (solucion y
+   pista se pliegan, ojo es un aviso) y "\|" para una barra dentro de una celda. */
+function md(src) {
+  const blocks = [];
+  src = src.replace(/\r\n?/g, "\n"); // los .md del repo pueden venir con CRLF
+  // extrae fenced code primero
+  src = src.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    blocks.push(`<pre><code>${esc(code.replace(/\n$/, ""))}</code></pre>`);
+    return `\u0000${blocks.length - 1}\u0000`;
+  });
+  const inline = mdInline;
+
+  const render = (lines) => {
+    let out = [], i = 0;
+    while (i < lines.length) {
+      let ln = lines[i];
+      const ph = ln.match(/^\u0000(\d+)\u0000$/);
+      if (ph) { out.push(blocks[+ph[1]]); i++; continue; }
+      const fence = ln.match(/^:::(\w+)\s*(.*)$/);
+      if (fence) {
+        const inner = []; i++;
+        while (i < lines.length && !/^:::\s*$/.test(lines[i])) inner.push(lines[i++]);
+        i++;
+        const [, kind, title] = fence;
+        const body = render(inner);
+        out.push(kind === "ojo"
+          ? `<div class="callout">${title ? `<strong>${inline(title)}</strong>` : ""}${body}</div>`
+          : `<details class="fold"><summary>${inline(title || (kind === "pista" ? "Pista" : "Ver solución"))}</summary><div class="fold__body">${body}</div></details>`);
+        continue;
+      }
+      if (/^#{1,3}\s/.test(ln)) {
+        const lvl = ln.match(/^#+/)[0].length;
+        out.push(`<h${lvl}>${inline(ln.replace(/^#+\s/, ""))}</h${lvl}>`); i++; continue;
+      }
+      if (/^>\s?/.test(ln)) {
+        let buf = [];
+        while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(inline(lines[i].replace(/^>\s?/, ""))); i++; }
+        out.push(`<blockquote>${buf.join("<br>")}</blockquote>`); continue;
+      }
+      if (/^\s*\|.*\|\s*$/.test(ln) && i + 1 < lines.length && /^\s*\|[-:\s|]+\|\s*$/.test(lines[i + 1])) {
+        const row = (l) => l.trim().replace(/\\\|/g, "\u0001").replace(/^\||\|$/g, "").split("|")
+          .map((c) => c.trim().replace(/\u0001/g, "|"));
+        const head = row(ln); i += 2;
+        let body = [];
+        while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { body.push(row(lines[i])); i++; }
+        out.push(`<table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead>`
+          + `<tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+        continue;
+      }
+      if (/^\s*[-*]\s/.test(ln)) {
+        let buf = [];
+        while (i < lines.length && /^\s*[-*]\s/.test(lines[i])) { buf.push(`<li>${inline(lines[i].replace(/^\s*[-*]\s/, ""))}</li>`); i++; }
+        out.push(`<ul>${buf.join("")}</ul>`); continue;
+      }
+      if (/^\s*\d+\.\s/.test(ln)) {
+        let buf = [];
+        while (i < lines.length && /^\s*\d+\.\s/.test(lines[i])) { buf.push(`<li>${inline(lines[i].replace(/^\s*\d+\.\s/, ""))}</li>`); i++; }
+        out.push(`<ol>${buf.join("")}</ol>`); continue;
+      }
+      if (ln.trim() === "") { i++; continue; }
+      // la primera línea se consume siempre: una línea que ningún bloque reconoce
+      // (p.ej. "|" suelto o ":::" sin abrir) no puede dejar el bucle parado
+      let buf = [inline(lines[i++])];
+      while (i < lines.length && lines[i].trim() !== "" && !/^(#{1,3}\s|>|:::|\s*[-*]\s|\s*\d+\.\s|\s*\|)/.test(lines[i]) && !/^\u0000\d+\u0000$/.test(lines[i])) {
+        buf.push(inline(lines[i])); i++;
+      }
+      if (buf.length) out.push(`<p>${buf.join(" ")}</p>`);
+    }
+    return out.join("\n");
+  };
+  return render(src.split("\n"));
+}
+
+/* ---------- componentes ---------- */
+function diffDots(n) {
+  return `<span class="diff" title="dificultad ${n}/3">`
+    + [1, 2, 3].map((k) => `<i class="${k <= n ? "on" : ""}"></i>`).join("") + "</span>";
+}
+
+const catsHTML = (l) => (l.categories || [])
+  .map((c) => `<span class="cat cat-${c.toLowerCase()}">${esc(c)}</span>`).join("");
+
+const liveBadge = '<span class="badge live"><span class="dot"></span>activo</span>';
+
+function cardHTML(l) {
+  return `<article class="card" tabindex="0" role="button" data-id="${l.id}" aria-label="Abrir lab ${l.id}: ${esc(l.name)}">
+    <div class="card__top">
+      <span class="card__id">LAB ${l.id}</span>
+      <span class="card__state">${l.running ? liveBadge : diffDots(l.difficulty)}</span>
+    </div>
+    <div class="card__cats">${catsHTML(l)}</div>
+    <h3 class="card__title">${esc(l.name)}</h3>
+    ${l.description ? `<p class="card__desc">${esc(l.description)}</p>` : ""}
+    <div class="card__skills">
+      ${l.skills.slice(0, 4).map((s) => `<span class="tag">${esc(s)}</span>`).join("")}
+    </div>
+  </article>`;
+}
+
+/* ---------- labs en ejecución ---------- */
+const runningLabs = () => STATE.labs.filter((l) => l.running);
+
+function runningPanelHTML() {
+  const rl = runningLabs();
+  if (!rl.length) {
+    return `<div class="running running--empty">Ningún lab en ejecución. Abre uno y pulsa <strong>▶ Iniciar</strong>.</div>`;
+  }
+  return `<div class="running">
+    ${rl.map((l) => `<div class="running__row">
+      <span class="badge live"><span class="dot"></span>LAB ${l.id}</span>
+      <span class="running__name">${esc(l.name)}</span>
+      ${l.destroyIn != null ? `<span class="badge warn" data-countdown="${l.id}">se destruye en ${fmtSecs(l.destroyIn)}</span>` : ""}
+      <span class="running__cats">${catsHTML(l)}</span>
+      <span class="running__actions">
+        <button class="btn btn--sm" data-open="${l.id}">Abrir</button>
+        <a class="btn btn--sm" href="http://localhost:${l.ttydPort}" target="_blank" rel="noopener">Terminal ↗</a>
+        <button class="btn btn--sm btn--danger" data-stop="${l.id}">■ Detener</button>
+      </span>
+    </div>`).join("")}
+    ${rl.length > 1 ? '<div class="running__warn">⚠ Hay varios labs corriendo a la vez: consumen más RAM y CPU. Detén los que no uses.</div>' : ""}
+  </div>`;
+}
+
+function bindRunningPanel(root) {
+  root.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => renderDetail(b.dataset.open)));
+  root.querySelectorAll("[data-stop]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    b.innerHTML = '<span class="spinner"></span> Deteniendo…';
+    await stopLab(b.dataset.stop);
+    toast(`Lab ${b.dataset.stop} detenido`);
+  }));
+}
+
+async function stopLab(id) {
+  const l = STATE.labs.find((x) => x.id === id);
+  if (l) l.stopping = true;
+  try { await api(`/api/labs/${id}/stop`, "POST"); } catch (e) { toast("Error: " + e.message); }
+  await refreshRunning();
+  if (l) l.stopping = false;
+}
+
+/* ---------- autodestrucción ---------- */
+/* Banner en el detalle: cuenta atrás tras resolver + aviso de TTL. */
+function renderLifeBanner() {
+  const slot = view.querySelector("#lifeBanner");
+  if (!slot) return;
+  const l = STATE.labs.find((x) => x.id === STATE.view);
+  if (!l || !l.running) { slot.innerHTML = ""; return; }
+  if (l.destroyIn != null) {
+    slot.innerHTML = `<div class="notice notice--ok" role="status">
+      <span>✓ Lab resuelto. Se autodestruirá en <strong data-countdown="${l.id}">${fmtSecs(l.destroyIn)}</strong> (contenedores, red y volúmenes).</span>
+      <span class="notice__actions">
+        <button class="btn btn--sm" id="btnKeep">Mantener abierto</button>
+        <button class="btn btn--sm btn--danger" id="btnDestroyNow">Destruir ahora</button>
+      </span>
+    </div>`;
+    slot.querySelector("#btnKeep").addEventListener("click", async () => {
+      try { await api(`/api/labs/${l.id}/keep`, "POST"); } catch (_) {}
+      l.destroyIn = null;
+      toast("Se mantiene abierto (el tiempo máximo sigue corriendo)");
+      renderLifeBanner(); updateRunningUI(true);
+    });
+    slot.querySelector("#btnDestroyNow").addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      e.target.innerHTML = '<span class="spinner"></span> Destruyendo…';
+      await stopLab(l.id);
+      toast(`Lab ${l.id} destruido`);
+      const t = view.querySelector("#termSlot"); if (t) { t.dataset.url = ""; mountTerminal(l); }
+      refreshStatus(l);
+    });
+    return;
+  }
+  if (l.expiresIn != null && l.expiresIn <= 15 * 60) {
+    slot.innerHTML = `<div class="notice" role="status">⏱ Este lab alcanza su tiempo máximo y se autodestruirá en <strong data-countdown-ttl="${l.id}">${fmtSecs(l.expiresIn)}</strong>.</div>`;
+    return;
+  }
+  slot.innerHTML = "";
+}
+
+/* Reloj local de 1 s para las cuentas atrás (el backend manda la verdad cada POLL_MS). */
+function tick() {
+  STATE.labs.forEach((l) => {
+    if (l.destroyIn != null && l.destroyIn > 0) l.destroyIn--;
+    if (l.expiresIn != null && l.expiresIn > 0) l.expiresIn--;
+  });
+  document.querySelectorAll("[data-countdown]").forEach((el) => {
+    const l = STATE.labs.find((x) => x.id === el.dataset.countdown);
+    if (l && l.destroyIn != null) el.textContent = (el.classList.contains("badge") ? "se destruye en " : "") + fmtSecs(l.destroyIn);
+  });
+  document.querySelectorAll("[data-countdown-ttl]").forEach((el) => {
+    const l = STATE.labs.find((x) => x.id === el.dataset.countdownTtl);
+    if (l && l.expiresIn != null) el.textContent = fmtSecs(l.expiresIn);
+  });
+  if (STATE.labs.some((l) => l.destroyIn === 0)) refreshRunning();
+}
+
+/* Pide los labs activos al backend y actualiza toda la UI que depende de ello. */
+async function refreshRunning() {
+  let d;
+  try { d = await api("/api/running"); } catch (_) { return; }
+  const set = new Set(d.running);
+  const life = d.lifecycle || {};
+  let changed = false;
+  STATE.labs.forEach((l) => {
+    const r = set.has(l.id);
+    if (l.running !== r) {
+      // Estaba corriendo y desapareció sin pulsar Detener: lo destruyó el backend.
+      if (l.running && !r && !l.stopping) toast(`Lab ${l.id} autodestruido`);
+      l.running = r; changed = true;
+    }
+    const lc = life[l.id] || {};
+    const dIn = r ? (lc.destroyIn ?? null) : null;
+    if ((l.destroyIn == null) !== (dIn == null)) changed = true;
+    l.destroyIn = dIn;
+    l.expiresIn = r ? (lc.expiresIn ?? null) : null;
+  });
+  updateRunningUI(changed);
+  renderLifeBanner();
+}
+
+function updateRunningUI(changed = true) {
+  const n = runningLabs().length;
+  const ind = document.getElementById("runIndicator");
+  if (ind) {
+    ind.hidden = n === 0;
+    ind.innerHTML = `<span class="dot"></span>${n} en ejecución`;
+  }
+  if (!changed) return;
+  if (STATE.view === "home") {
+    const slot = view.querySelector("#runningSlot");
+    if (slot) { slot.innerHTML = runningPanelHTML(); bindRunningPanel(slot); }
+    view.querySelectorAll(".card").forEach((c) => {
+      const l = STATE.labs.find((x) => x.id === c.dataset.id);
+      c.querySelector(".card__state").innerHTML = l.running ? liveBadge : diffDots(l.difficulty);
+    });
+  } else {
+    renderOthersBanner();
+  }
+}
+
+/* En la vista de detalle: aviso si hay OTROS labs corriendo. */
+function renderOthersBanner() {
+  const slot = view.querySelector("#othersBanner");
+  if (!slot) return;
+  const others = runningLabs().filter((l) => l.id !== STATE.view);
+  if (!others.length) { slot.innerHTML = ""; return; }
+  slot.innerHTML = `<div class="notice">
+    <span>⚠ También en ejecución: ${others.map((l) => `<a href="#" data-open="${l.id}">LAB ${l.id} · ${esc(l.name)}</a>`).join(", ")}</span>
+  </div>`;
+  slot.querySelectorAll("[data-open]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); renderDetail(a.dataset.open); }));
+}
+
+/* Diálogo de conflicto. Resuelve "stop" | "force" | null (cancelar). */
+function askConflict(l, ids) {
+  const others = ids.map((id) => STATE.labs.find((x) => x.id === id)).filter(Boolean);
+  let dlg = document.getElementById("conflictDialog");
+  if (!dlg) {
+    dlg = document.createElement("dialog");
+    dlg.id = "conflictDialog";
+    dlg.className = "dialog";
+    document.body.appendChild(dlg);
+  }
+  dlg.innerHTML = `<form method="dialog">
+    <h2 class="dialog__title">Ya hay ${others.length > 1 ? "labs corriendo" : "un lab corriendo"}</h2>
+    <p class="dialog__text">Vas a iniciar <strong>LAB ${l.id} · ${esc(l.name)}</strong>, pero ya está en ejecución:</p>
+    <ul class="dialog__list">${others.map((o) => `<li><span class="badge live"><span class="dot"></span>LAB ${o.id}</span> ${esc(o.name)}</li>`).join("")}</ul>
+    <p class="dialog__text dialog__muted">Correr varios labs a la vez consume más RAM y CPU. Lo recomendable es detener ${others.length > 1 ? "los otros" : "el otro"} antes.</p>
+    <div class="dialog__actions">
+      <button class="btn" value="cancel">Cancelar</button>
+      <button class="btn" value="force">Iniciar de todos modos</button>
+      <button class="btn btn--primary" value="stop" autofocus>Detener y continuar</button>
+    </div>
+  </form>`;
+  return new Promise((resolve) => {
+    dlg.addEventListener("close", () => {
+      const v = dlg.returnValue;
+      resolve(v === "stop" || v === "force" ? v : null);
+    }, { once: true });
+    dlg.returnValue = "";
+    dlg.showModal();
+  });
+}
+
+/* start/reset con aviso: si el backend responde conflicto, pregunta al usuario. */
+async function guardedAction(l, action) {
+  let r = await api(`/api/labs/${l.id}/${action}`, "POST");
+  if (!r.conflict) return r;
+  const choice = await askConflict(l, r.running);
+  if (!choice) return null;
+  if (choice === "stop") {
+    for (const id of r.running) {
+      try { await api(`/api/labs/${id}/stop`, "POST"); } catch (_) {}
+    }
+    await refreshRunning();
+  }
+  return api(`/api/labs/${l.id}/${action}?force=1`, "POST");
+}
+
+/* ---------- cursos ---------- */
+const cursoById = (id) => STATE.cursos.find((c) => c.id === id);
+const labsForCurso = (id) => STATE.labs.filter((l) => (l.cursos || []).includes(id));
+
+/* Resalta en el nav "Cursos" o el filtro de pista activo. */
+function setNav(section) {
+  document.querySelectorAll(".chip[data-filter]").forEach((x) =>
+    x.setAttribute("aria-pressed", section !== "cursos" && x.dataset.filter === STATE.filter));
+  const c = document.querySelector('.chip[data-route="cursos"]');
+  if (c) c.setAttribute("aria-pressed", section === "cursos");
+}
+
+/* Aviso del detalle de un lab: "¿Dificultad? Lee 04 · … y 05 · … para mejorar." */
+function helpHTML(l) {
+  const links = (l.cursos || []).map(cursoById).filter(Boolean)
+    .map((c) => `<a href="#curso/${c.id}">${c.id} · ${esc(c.title)}</a>`);
+  if (!links.length) return "";
+  const list = links.length > 1 ? `${links.slice(0, -1).join(", ")} y ${links[links.length - 1]}` : links[0];
+  return `<div class="help" role="note"><span class="help__q">¿Dificultad?</span> Lee ${list} para mejorar.</div>`;
+}
+
+function renderCourses() {
+  STATE.view = "cursos";
+  setNav("cursos");
+  window.scrollTo(0, 0);
+  const cards = STATE.cursos.map((c) => {
+    const labs = labsForCurso(c.id);
+    const tags = labs.length
+      ? labs.map((l) => `<span class="tag" title="${esc(l.name)}">LAB ${l.id}</span>`).join("")
+      : `<span class="tag">${c.id === "00" ? "Empieza aquí" : "Base para todos los labs"}</span>`;
+    return `<article class="card" tabindex="0" role="button" data-curso="${c.id}" aria-label="Abrir módulo ${c.id}: ${esc(c.title)}">
+      <div class="card__top"><span class="card__id">MÓDULO ${c.id}</span></div>
+      <h3 class="card__title">${esc(c.title)}</h3>
+      ${c.summary ? `<p class="card__desc">${mdInline(c.summary)}</p>` : ""}
+      <div class="card__skills">${tags}</div>
+    </article>`;
+  }).join("");
+
+  view.innerHTML = `
+    <section class="hero">
+      <h1>Cursos</h1>
+      <p>Módulos para entender lo que ejecutas en los labs 01 a 23. No dan la respuesta de ningún lab: explican los conceptos, las herramientas y cómo leer su salida. Si empiezas de cero, abre el 00.</p>
+    </section>
+    <div class="section-label">Módulos</div>
+    <div class="grid">${cards || '<p class="empty">No hay cursos disponibles.</p>'}</div>
+  `;
+  view.querySelectorAll(".card[data-curso]").forEach((c) => {
+    const open = () => renderCourse(c.dataset.curso);
+    c.addEventListener("click", open);
+    c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+  });
+}
+
+async function renderCourse(id) {
+  const c = cursoById(id);
+  if (!c) return renderCourses();
+  STATE.view = "curso:" + id;
+  setNav("cursos");
+  window.scrollTo(0, 0);
+  const i = STATE.cursos.indexOf(c);
+  const prev = STATE.cursos[i - 1], next = STATE.cursos[i + 1];
+  const labs = labsForCurso(id);
+
+  view.innerHTML = `
+    <a class="detail__back" href="#cursos">← Todos los cursos</a>
+    ${labs.length ? `<div class="course__labs"><span class="muted">Se aplica en</span>
+      ${labs.map((l) => `<a class="tag" href="#lab/${l.id}" title="${esc(l.name)}">LAB ${l.id}</a>`).join("")}</div>` : ""}
+    <article class="md course__body" id="mdCurso">Cargando…</article>
+    <nav class="course__pager" aria-label="Módulos">
+      ${prev ? `<a class="btn" href="#curso/${prev.id}">← ${prev.id} · ${esc(prev.title)}</a>` : "<span></span>"}
+      ${next ? `<a class="btn" href="#curso/${next.id}">${next.id} · ${esc(next.title)} →</a>` : ""}
+    </nav>
+  `;
+  let txt = null;
+  try { txt = (await api(`/api/cursos/${id}`)).markdown; } catch (_) {}
+  if (STATE.view !== "curso:" + id) return; // el usuario ya navegó a otra vista
+  view.querySelector("#mdCurso").innerHTML = txt ? md(txt) : "No disponible.";
+}
+
+function renderHome() {
+  STATE.view = "home";
+  setNav("home");
+  const labs = STATE.labs.filter((l) => STATE.filter === "all" || l.track === STATE.filter);
+  const byTrack = { A: [], B: [], C: [] };
+  labs.forEach((l) => byTrack[l.track].push(l));
+  const trackHTML = (t) => (STATE.filter === "all" || STATE.filter === t)
+    ? `<div class="section-label">${TRACKS[t]}</div>
+    <div class="grid">${byTrack[t].map(cardHTML).join("") || '<p class="empty">Sin labs en esta pista.</p>'}</div>` : "";
+
+  view.innerHTML = `
+    <section class="hero">
+      <h1>Laboratorio de defensa en Linux</h1>
+      <p>Escenarios reales de detección, respuesta a incidentes y hardening. Levanta un contenedor con un botón, abre la terminal en el navegador y valida tu solución. Todo local e inofensivo.</p>
+    </section>
+    <div class="section-label" id="runningLabel">En ejecución</div>
+    <div id="runningSlot">${runningPanelHTML()}</div>
+    ${trackHTML("A")}
+    ${trackHTML("B")}
+    ${trackHTML("C")}
+  `;
+
+  bindRunningPanel(view.querySelector("#runningSlot"));
+  updateRunningUI(false);
+  view.querySelectorAll(".card").forEach((c) => {
+    const open = () => renderDetail(c.dataset.id);
+    c.addEventListener("click", open);
+    c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+  });
+}
+
+async function renderDetail(id) {
+  const l = STATE.labs.find((x) => x.id === id);
+  if (!l) return renderHome();
+  STATE.view = id;
+  setNav("home");
+  window.scrollTo(0, 0);
+
+  view.innerHTML = `
+    <a class="detail__back" href="#" id="back">← Todos los labs</a>
+    <div class="detail__head">
+      <div>
+        <div class="card__id">LAB ${l.id} · ${TRACKS[l.track]}</div>
+        <h1 class="detail__title">${esc(l.name)}</h1>
+        ${l.description ? `<p class="detail__desc">${esc(l.description)}</p>` : ""}
+        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)} <span id="statusText">comprobando…</span></div>
+      </div>
+    </div>
+    ${helpHTML(l)}
+    <div id="lifeBanner"></div>
+    <div id="othersBanner"></div>
+    <div class="toolbar">
+      <button class="btn btn--primary" id="btnStart">▶ Iniciar</button>
+      <button class="btn" id="btnCheck">✓ Validar</button>
+      <button class="btn" id="btnReset">↻ Reiniciar</button>
+      <button class="btn btn--danger" id="btnStop">■ Detener</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-panel="reto" aria-selected="true">Reto</button>
+      <button class="tab" role="tab" data-panel="term">Terminal</button>
+      <button class="tab" role="tab" data-panel="check">Validación</button>
+      <button class="tab" role="tab" data-panel="sol">Solución</button>
+    </div>
+    <div class="panel active" data-panel="reto"><div class="md" id="mdReto">Cargando…</div></div>
+    <div class="panel" data-panel="term"><div id="termSlot"></div></div>
+    <div class="panel" data-panel="check"><p class="empty" id="checkEmpty">Pulsa <strong>Validar</strong> con el lab activo para ver el resultado.</p><pre class="output" id="checkOut" style="display:none"></pre></div>
+    <div class="panel" data-panel="sol"><div class="md" id="mdSol">Cargando…</div></div>
+  `;
+
+  view.querySelector("#back").addEventListener("click", (e) => { e.preventDefault(); renderHome(); });
+
+  // tabs
+  const tabs = [...view.querySelectorAll(".tab")];
+  tabs.forEach((t) => t.addEventListener("click", () => {
+    tabs.forEach((x) => x.setAttribute("aria-selected", x === t));
+    view.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === t.dataset.panel));
+    if (t.dataset.panel === "term") mountTerminal(l);
+  }));
+
+  // contenido markdown
+  api(`/api/labs/${id}/reto`).then((d) => { view.querySelector("#mdReto").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; });
+  api(`/api/labs/${id}/solucion`).then((d) => { view.querySelector("#mdSol").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
+    .catch(() => { view.querySelector("#mdSol").textContent = "No disponible."; });
+
+  // acciones
+  const setBusy = (btn, busy, label) => {
+    btn.disabled = busy;
+    btn.innerHTML = busy ? `<span class="spinner"></span> ${label}` : btn.dataset.label;
+  };
+  const bind = (sel, label, action, after) => {
+    const b = view.querySelector(sel); b.dataset.label = b.innerHTML;
+    b.addEventListener("click", async () => {
+      setBusy(b, true, label);
+      try {
+        const r = (action === "start" || action === "reset")
+          ? await guardedAction(l, action)
+          : await api(`/api/labs/${id}/${action}`, "POST");
+        if (r) after(r); else toast("Cancelado");
+      } catch (e) { toast("Error: " + e.message); }
+      setBusy(b, false);
+      refreshStatus(l);
+      refreshRunning();
+    });
+  };
+
+  bind("#btnStart", "Iniciando…", "start", (r) => {
+    toast(r.ok ? "Lab iniciado" : "Fallo al iniciar");
+    if (r.ok) { switchTab("term"); mountTerminal(l); }
+    else showCheck(r.output, false);
+  });
+  bind("#btnReset", "Reiniciando…", "reset", (r) => { toast(r.ok ? "Escenario re-plantado" : "Fallo al reiniciar"); });
+  bind("#btnStop", "Deteniendo…", "stop", (r) => { toast("Lab detenido y destruido"); l.running = false; l.destroyIn = null; clearTerminal(l); });
+  bind("#btnCheck", "Validando…", "check", (r) => {
+    switchTab("check"); showCheck(r.output || "(sin salida)", r.ok);
+    toast(r.ok ? "¡Resuelto! 🎉" : "Aún faltan objetivos");
+    if (r.ok) { l.destroyIn = r.destroyIn; renderLifeBanner(); updateRunningUI(true); }
+  });
+
+  renderOthersBanner();
+  renderLifeBanner();
+  refreshStatus(l);
+}
+
+function switchTab(panel) {
+  const t = view.querySelector(`.tab[data-panel="${panel}"]`);
+  if (t) t.click();
+}
+
+function showCheck(text, ok) {
+  const out = view.querySelector("#checkOut");
+  const empty = view.querySelector("#checkEmpty");
+  if (!out) return;
+  empty.style.display = "none";
+  out.style.display = "block";
+  out.textContent = text;
+  out.className = "output " + (ok ? "ok" : "fail");
+}
+
+async function refreshStatus(l) {
+  try {
+    const s = await api(`/api/labs/${l.id}/status`);
+    l.running = s.running;
+    l.destroyIn = s.running ? s.destroyIn : null;
+    l.expiresIn = s.running ? s.expiresIn : null;
+    const st = view.querySelector("#statusText");
+    if (st) st.innerHTML = s.running
+      ? '<span class="badge live"><span class="dot"></span>activo</span>'
+        + (l.expiresIn != null ? ` <span class="muted">· autodestrucción como máximo en <span data-countdown-ttl="${l.id}">${fmtSecs(l.expiresIn)}</span></span>` : "")
+      : '<span class="badge"><span class="dot"></span>detenido</span>';
+    renderLifeBanner();
+    const term = view.querySelector(".panel[data-panel='term']");
+    if (term && term.classList.contains("active")) mountTerminal(l);
+  } catch (_) {}
+}
+
+function mountTerminal(l) {
+  const slot = view.querySelector("#termSlot");
+  if (!slot) return;
+  if (!l.running) {
+    slot.innerHTML = `<div class="term-wrap"><div class="term-off">El contenedor no está activo.<br>Pulsa <strong>▶ Iniciar</strong> para abrir la terminal.</div></div>`;
+    return;
+  }
+  const url = `http://localhost:${l.ttydPort}`;
+  if (slot.dataset.url === url) return; // ya montado
+  slot.dataset.url = url;
+  slot.innerHTML = `<div class="term-wrap">
+      <div class="term-bar"><span>● analista@lab-${l.id}</span><span style="flex:1"></span><a href="${url}" target="_blank" rel="noopener" style="color:var(--fg-muted)">abrir en pestaña ↗</a></div>
+      <iframe src="${url}" title="Terminal del lab ${l.id}" allow="clipboard-read; clipboard-write"></iframe>
+    </div>`;
+}
+
+function clearTerminal(l) {
+  const slot = view.querySelector("#termSlot");
+  if (slot) { slot.dataset.url = ""; mountTerminal(l); }
+}
+
+/* ---------- arranque ---------- */
+function initTheme() {
+  const saved = (() => { try { return localStorage.getItem("tc-theme"); } catch { return null; } })();
+  if (saved) document.documentElement.dataset.theme = saved;
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("tc-theme", next); } catch {}
+  });
+}
+
+function initFilters() {
+  document.querySelectorAll(".chip[data-filter]").forEach((c) => c.addEventListener("click", () => {
+    STATE.filter = c.dataset.filter;
+    renderHome();
+  }));
+  document.querySelector('.chip[data-route="cursos"]').addEventListener("click", renderCourses);
+  // Enlaces internos del markdown y de las vistas: #cursos, #curso/NN, #lab/NN.
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    const h = a.getAttribute("href");
+    let m;
+    if (h === "#cursos") { e.preventDefault(); renderCourses(); }
+    else if ((m = h.match(/^#curso\/(\d{2})$/))) { e.preventDefault(); renderCourse(m[1]); }
+    else if ((m = h.match(/^#lab\/(\d{2})$/))) { e.preventDefault(); renderDetail(m[1]); }
+  });
+  document.querySelector(".brand").addEventListener("click", (e) => { e.preventDefault(); renderHome(); });
+  document.getElementById("runIndicator").addEventListener("click", () => {
+    if (STATE.view !== "home") renderHome();
+    view.querySelector("#runningLabel").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function initPolling() {
+  setInterval(() => { if (document.visibilityState === "visible") refreshRunning(); }, POLL_MS);
+  setInterval(tick, 1000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refreshRunning(); });
+}
+
+async function boot() {
+  initTheme();
+  initFilters();
+  try {
+    const [d, c] = await Promise.all([
+      api("/api/labs"),
+      api("/api/cursos").catch(() => ({ cursos: [] })), // sin cursos la web sigue funcionando
+    ]);
+    STATE.labs = d.labs;
+    STATE.cursos = c.cursos || [];
+    renderHome();
+    initPolling();
+  } catch (e) {
+    view.innerHTML = `<div class="empty">No se pudo contactar el backend. ¿Corriste <code>python3 server.py</code>?<br><small>${esc(e.message)}</small></div>`;
+  }
+}
+
+boot();

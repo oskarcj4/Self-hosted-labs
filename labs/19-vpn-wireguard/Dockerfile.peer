@@ -1,0 +1,9 @@
+FROM debian:12-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      wireguard-tools iproute2 iputils-ping \
+      ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY setup/peer-setup.sh /opt/peer-setup.sh
+RUN chmod +x /opt/peer-setup.sh && mkdir -p /etc/wireguard /shared
+CMD ["/opt/peer-setup.sh"]
