@@ -1,0 +1,21 @@
+name: pedidos
+
+services:
+  api:
+    image: python:3.12-alpine
+    command: ["python", "-u", "/app/api.py"]
+    volumes:
+      - ./app:/app:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
+  worker:
+    image: python:3.12-alpine
+    command: ["python", "-u", "/app/worker.py"]
+    environment:
+      LOG_LEVEL: DEBUG        # temporal: depuración de la caída del jueves
+      BACKLOG: "1150000"
+    volumes:
+      - ./app:/app:ro
+    restart: unless-stopped

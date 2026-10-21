@@ -2,7 +2,7 @@
 "use strict";
 
 const view = document.getElementById("view");
-const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)" };
+const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)" };
 let STATE = { labs: [], cursos: [], filter: "all", view: "home" };
 const POLL_MS = 8000; // refresco de "labs en ejecución"
 
@@ -44,7 +44,8 @@ const mdInline = (t) => esc(t)
     : `<a href="${href}" target="_blank" rel="noopener">${txt}</a>`);
 
 /* Además del markdown básico: bloques ":::tipo Título" … ":::" (solucion y
-   pista se pliegan, ojo es un aviso) y "\|" para una barra dentro de una celda. */
+   pista se pliegan, ojo es un aviso, piensa una pregunta para razonar) y "\|"
+   para una barra dentro de una celda. */
 function md(src) {
   const blocks = [];
   src = src.replace(/\r\n?/g, "\n"); // los .md del repo pueden venir con CRLF
@@ -68,8 +69,8 @@ function md(src) {
         i++;
         const [, kind, title] = fence;
         const body = render(inner);
-        out.push(kind === "ojo"
-          ? `<div class="callout">${title ? `<strong>${inline(title)}</strong>` : ""}${body}</div>`
+        out.push(kind === "ojo" || kind === "piensa"
+          ? `<div class="callout${kind === "piensa" ? " callout--think" : ""}">${title ? `<strong>${inline(title)}</strong>` : ""}${body}</div>`
           : `<details class="fold"><summary>${inline(title || (kind === "pista" ? "Pista" : "Ver solución"))}</summary><div class="fold__body">${body}</div></details>`);
         continue;
       }
@@ -461,7 +462,7 @@ function renderHome() {
   setHash("");
   setNav("home");
   const labs = STATE.labs.filter((l) => STATE.filter === "all" || l.track === STATE.filter);
-  const byTrack = { A: [], B: [], C: [] };
+  const byTrack = { A: [], B: [], C: [], D: [] };
   labs.forEach((l) => byTrack[l.track].push(l));
   const trackHTML = (t) => (STATE.filter === "all" || STATE.filter === t)
     ? `<div class="section-label">${TRACKS[t]}</div>
@@ -477,6 +478,7 @@ function renderHome() {
     ${trackHTML("A")}
     ${trackHTML("B")}
     ${trackHTML("C")}
+    ${trackHTML("D")}
   `;
 
   bindRunningPanel(view.querySelector("#runningSlot"));
@@ -526,13 +528,17 @@ async function renderDetail(id) {
       <div class="workspace${briefHidden() ? " workspace--nobrief" : ""}" id="workspace">
         <aside class="brief" aria-label="Enunciado del reto">
           <div class="brief__head">
-            <span class="brief__label">Enunciado · LAB ${l.id}</span>
+            <div class="brief__tabs" role="tablist" aria-label="Lateral del LAB ${l.id}">
+              <button class="brief__tab" role="tab" data-brief-tab="reto" aria-selected="true">Enunciado</button>
+              <button class="brief__tab" role="tab" data-brief-tab="guia" aria-selected="false" title="Paso a paso explicado: cómo pensar y actuar">Guiada</button>
+            </div>
             <button class="linkbtn" data-brief-check title="Validar la solución">✓ Validar</button>
-            <button class="linkbtn" data-brief-toggle title="Ocultar enunciado">Ocultar ⇤</button>
+            <button class="linkbtn" data-brief-toggle title="Ocultar lateral">Ocultar ⇤</button>
           </div>
           <div class="brief__scroll">
             <pre class="output" id="briefCheck" hidden></pre>
-            <div class="md brief__body" id="mdBrief">Cargando…</div>
+            <div class="md brief__body" id="mdBrief" data-brief-pane="reto">Cargando…</div>
+            <div class="md brief__body" id="mdGuia" data-brief-pane="guia" hidden>Cargando…</div>
           </div>
         </aside>
         <div class="workspace__term" id="termSlot"></div>
@@ -554,6 +560,8 @@ async function renderDetail(id) {
   }));
   view.querySelector("[data-brief-toggle]").addEventListener("click", () => toggleBrief(false));
   view.querySelector("[data-brief-check]").addEventListener("click", () => view.querySelector("#btnCheck").click());
+  view.querySelectorAll("[data-brief-tab]").forEach((b) => b.addEventListener("click", () => showBriefTab(b.dataset.briefTab)));
+  showBriefTab(briefTab());
 
   // contenido markdown (el enunciado va también al lateral de la pestaña Terminal)
   api(`/api/labs/${id}/reto`).then((d) => {
@@ -563,6 +571,8 @@ async function renderDetail(id) {
   });
   api(`/api/labs/${id}/solucion`).then((d) => { view.querySelector("#mdSol").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
     .catch(() => { view.querySelector("#mdSol").textContent = "No disponible."; });
+  api(`/api/labs/${id}/guia`).then((d) => { view.querySelector("#mdGuia").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
+    .catch(() => { view.querySelector("#mdGuia").textContent = "Este lab aún no tiene resolución guiada."; });
 
   // acciones
   const setBusy = (btn, busy, label) => {
@@ -650,6 +660,18 @@ const termVisible = () => !!view.querySelector(".panel[data-panel='term'].active
 /* Lateral con el enunciado: se puede ocultar para dar todo el ancho a la shell. */
 function briefHidden() {
   try { return localStorage.getItem("tc-brief") === "hidden"; } catch { return false; }
+}
+/* Pestañas del lateral: Enunciado o resolución Guiada. Se recuerda la última
+   elegida, así quien va con la guía no tiene que reabrirla en cada lab. */
+function briefTab() {
+  try { return localStorage.getItem("tc-brief-tab") === "guia" ? "guia" : "reto"; } catch { return "reto"; }
+}
+function showBriefTab(tab) {
+  view.querySelectorAll("[data-brief-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.briefTab === tab));
+  view.querySelectorAll("[data-brief-pane]").forEach((p) => { p.hidden = p.dataset.briefPane !== tab; });
+  const scroll = view.querySelector(".brief__scroll");
+  if (scroll) scroll.scrollTop = 0;
+  try { localStorage.setItem("tc-brief-tab", tab); } catch {}
 }
 function toggleBrief(show) {
   const ws = view.querySelector("#workspace");

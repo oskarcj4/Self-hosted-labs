@@ -1,0 +1,59 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-57
+    hostname: dev-01
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    depends_on:
+      - bastion
+      - app
+    networks:
+      dmz:
+        ipv4_address: 10.76.57.10
+    ports:
+      - "127.0.0.1:7657:7681"   # terminal web (ttyd)
+
+  # Bastión: única máquina con pie en las dos redes.
+  bastion:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: tc-lab-57-bastion
+    hostname: bastion
+    environment:
+      ROLE: bastion
+    networks:
+      dmz:
+        ipv4_address: 10.76.57.5
+      interna:
+        ipv4_address: 10.77.57.5
+
+  # Servidor interno: sólo alcanzable a través del bastión.
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: tc-lab-57-app
+    hostname: app-02
+    environment:
+      ROLE: app
+    networks:
+      interna:
+        ipv4_address: 10.77.57.20
+
+networks:
+  dmz:
+    ipam:
+      config:
+        - subnet: 10.76.57.0/24
+  interna:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.77.57.0/24

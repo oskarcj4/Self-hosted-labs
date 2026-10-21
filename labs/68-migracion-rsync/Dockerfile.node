@@ -1,0 +1,10 @@
+# Lab 68 — old-srv: servidor viejo (SSH + rsync), sin terminal web.
+FROM debian:12-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      openssh-server rsync python3 sudo \
+    && rm -rf /var/lib/apt/lists/*
+COPY setup-node/ /opt/node/
+COPY setup/manifest.py /opt/node/manifest.py
+RUN chmod 0755 /opt/node/node.sh
+CMD ["/opt/node/node.sh"]

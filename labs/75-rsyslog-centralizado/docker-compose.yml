@@ -1,0 +1,43 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-75
+    hostname: log-01
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      lan:
+        ipv4_address: 10.76.75.10
+        aliases:
+          - log-01
+    ports:
+      - "127.0.0.1:7675:7681"   # terminal web (ttyd)
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: tc-lab-75-web
+    hostname: web-02
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      lan:
+        ipv4_address: 10.76.75.20
+        aliases:
+          - web-02
+
+networks:
+  lan:
+    ipam:
+      config:
+        - subnet: 10.76.75.0/24

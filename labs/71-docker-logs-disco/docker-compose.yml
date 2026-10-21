@@ -1,0 +1,13 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-71
+    hostname: docker-02
+    privileged: true      # Docker-in-Docker: el lab tiene su propio dockerd
+    init: true            # tini como PID 1 (recoge procesos huérfanos)
+    tmpfs:
+      # El "disco" de Docker del lab: pequeño a propósito, para que se llene.
+      - /var/lib/docker:size=320m
+    ports:
+      - "127.0.0.1:7671:7681"   # terminal web (ttyd)

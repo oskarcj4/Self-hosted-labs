@@ -1,0 +1,8 @@
+# Lab 57 — bastión y app-02: servidores SSH mínimos (sin terminal web).
+FROM debian:12-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-server \
+    && rm -rf /var/lib/apt/lists/*
+COPY setup-node/node.sh /opt/node.sh
+RUN chmod 0755 /opt/node.sh
+CMD ["/opt/node.sh"]

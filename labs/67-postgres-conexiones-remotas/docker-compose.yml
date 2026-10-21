@@ -1,0 +1,43 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-67
+    hostname: app-04
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    depends_on:
+      - db
+    networks:
+      lan:
+        ipv4_address: 10.76.67.10
+    ports:
+      - "127.0.0.1:7667:7681"   # terminal web (ttyd)
+
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.db
+    container_name: tc-lab-67-db
+    hostname: pg-01
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      lan:
+        ipv4_address: 10.76.67.20
+        aliases:
+          - pg-01
+
+networks:
+  lan:
+    ipam:
+      config:
+        - subnet: 10.76.67.0/24

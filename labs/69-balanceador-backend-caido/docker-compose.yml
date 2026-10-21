@@ -1,0 +1,51 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-69
+    hostname: lb-01
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    depends_on:
+      - app1
+      - app2
+      - app3
+    networks:
+      lan:
+        ipv4_address: 10.76.69.10
+    ports:
+      - "127.0.0.1:7669:7681"   # terminal web (ttyd)
+
+  app1:
+    build: { context: ., dockerfile: Dockerfile.node }
+    container_name: tc-lab-69-app1
+    hostname: app1
+    environment: { NAME: app1, MODE: ok }
+    networks:
+      lan: { ipv4_address: 10.76.69.21 }
+
+  app2:
+    build: { context: ., dockerfile: Dockerfile.node }
+    container_name: tc-lab-69-app2
+    hostname: app2
+    environment: { NAME: app2, MODE: "503" }
+    networks:
+      lan: { ipv4_address: 10.76.69.22 }
+
+  app3:
+    build: { context: ., dockerfile: Dockerfile.node }
+    container_name: tc-lab-69-app3
+    hostname: app3
+    environment: { NAME: app3, MODE: slow }
+    networks:
+      lan: { ipv4_address: 10.76.69.23 }
+
+networks:
+  lan:
+    ipam:
+      config:
+        - subnet: 10.76.69.0/24

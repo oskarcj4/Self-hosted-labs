@@ -10,7 +10,7 @@
 
 # 💸 Adiós a las plataformas que te cobran una fortuna por aprender hacking
 
-### 53 laboratorios reales de DevSecOps, respuesta a incidentes y hardening.<br>En tu máquina. Gratis. Con un solo comando.
+### 78 laboratorios reales de DevSecOps, SRE, respuesta a incidentes y hardening.<br>En tu máquina. Gratis. Con un solo comando.
 
 ```bash
 python server.py
@@ -150,6 +150,30 @@ Docker. Los días 1–15 son un servidor Debian con **systemd real**; los días
 | 15 | 38 | Endurecer un cron de root | | 30 | 53 | Limpiar la depuración de un incidente |
 
 Mapeo completo y créditos en [CATALOGO.md](CATALOGO.md).
+
+### 🚨 Pista D — Operaciones / SRE en producción (54–78)
+
+Los incidentes que de verdad te sacan de la cama: un servicio caído, el disco
+al 100%, un 502, un certificado caducado, un deploy que hay que revertir. 25
+casos del día a día (y algún *game day* con varias averías a la vez), todos
+sobre Debian con **systemd real** o con **su propio Docker dentro**. Cada uno
+se resuelve y se valida con `check.sh`.
+
+| # | Lab | | # | Lab |
+|---|---|---|---|---|
+| 54 | Servicio caído: arranque y reinicio | | 67 | PostgreSQL: conexiones remotas |
+| 55 | Disco lleno al 100% | | 68 | Migración de datos con rsync |
+| 56 | La app no llega a la base de datos | | 69 | Balanceador con un backend caído |
+| 57 | SSH a través de un bastión | | 70 | El cron no se ejecuta |
+| 58 | Backup a Blob storage por cron (3 AM) | | 71 | Logs de Docker llenan el disco |
+| 59 | Restaurar un backup de la BD | | 72 | Certificado TLS caducado |
+| 60 | El OOM killer mata el proceso | | 73 | Game day: varias averías a la vez |
+| 61 | DNS interno roto | | 74 | Escaneo de imágenes: a 0 CRITICAL |
+| 62 | 502 Bad Gateway en nginx | | 75 | Logs centralizados con rsyslog |
+| 63 | Bucle de reinicios | | 76 | Sinkhole DNS (estilo Pi-hole) |
+| 64 | Healthcheck y autorrecuperación | | 77 | Verificar paquetes antes de instalar |
+| 65 | Deploy fallido: rollback | | 78 | De iptables a nftables |
+| 66 | Too many open files | | | |
 
 ### 📚 Teoría de apoyo
 

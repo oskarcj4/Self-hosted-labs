@@ -1,0 +1,82 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-76
+    hostname: dns-01
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    depends_on:
+      - upstream
+    networks:
+      lan:
+        ipv4_address: 10.76.76.53
+    ports:
+      - "127.0.0.1:7676:7681"   # terminal web (ttyd)
+
+  # "Internet": el DNS del proveedor. Responde 203.0.113.10 a cualquier nombre.
+  upstream:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: tc-lab-76-upstream
+    hostname: dns-proveedor
+    environment:
+      ROLE: upstream
+    networks:
+      lan:
+        ipv4_address: 10.76.76.2
+
+  # Puestos de la oficina: usan dns-01 como DNS.
+  pc-01:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: tc-lab-76-pc-01
+    hostname: pc-01
+    environment:
+      ROLE: client
+    depends_on:
+      - lab
+    networks:
+      lan:
+        ipv4_address: 10.76.76.21
+
+  pc-02:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: tc-lab-76-pc-02
+    hostname: pc-02
+    environment:
+      ROLE: client
+      INFECTED: "1"
+    depends_on:
+      - lab
+    networks:
+      lan:
+        ipv4_address: 10.76.76.22
+
+  pc-03:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: tc-lab-76-pc-03
+    hostname: pc-03
+    environment:
+      ROLE: client
+    depends_on:
+      - lab
+    networks:
+      lan:
+        ipv4_address: 10.76.76.23
+
+networks:
+  lan:
+    ipam:
+      config:
+        - subnet: 10.76.76.0/24
