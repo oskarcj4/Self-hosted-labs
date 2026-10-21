@@ -44,7 +44,7 @@ navegador, botón de **Validar**— pero corriendo **100 % en local** sobre Dock
 ## ⚡ Arranque en 30 segundos
 
 ```bash
-git clone <https://github.com/oskarcj4/Self-hosted-labs.git> terminalcero-lab
+git clone https://github.com/oskarcj4/Self-hosted-labs.git terminalcero-lab
 cd terminalcero-lab
 python server.py          # en Linux/macOS: python3 server.py
 ```
