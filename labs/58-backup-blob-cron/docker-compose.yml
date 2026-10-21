@@ -1,0 +1,35 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-58
+    hostname: files-01
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    depends_on:
+      - blob
+    networks:
+      - default
+      - storage
+    ports:
+      - "127.0.0.1:7658:7681"   # terminal web (ttyd)
+
+  # Almacenamiento de objetos "en la nube", pero local: Azurite, el emulador
+  # oficial de Azure Blob Storage. Sólo es alcanzable desde la red interna.
+  blob:
+    image: mcr.microsoft.com/azure-storage/azurite:3.33.0
+    container_name: tc-lab-58-blob
+    hostname: blob-01
+    command: azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck --loose
+    networks:
+      storage:
+        aliases:
+          - blob-01
+
+networks:
+  storage:
+    internal: true

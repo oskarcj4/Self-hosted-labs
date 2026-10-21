@@ -88,3 +88,37 @@ Familias técnicas:
 - **Días 16–30**: Docker-in-Docker (`docker:27.5.1-dind`) con `python:3.12-alpine` precargada, sin necesidad de internet dentro del lab. Los proyectos viven en `/home/analista/<proyecto>`.
 
 Cada lab incluye `RETO.md`, `check.sh` (validador que deja la marca de resuelto), `solucion/SOLUCION.md` y `solucion/solve.sh` (solución automática que se usó para probar el lab).
+
+# Pista D — Operaciones / SRE en producción (labs 54–78)
+
+Casos reales de operaciones: diagnóstico de servicios, redes, almacenamiento, despliegues, respuesta a incidentes y endurecimiento. Escenarios, validadores y soluciones de implementación propia, que corren en local. La mayoría son Debian 12 con systemd real; algunos (varias máquinas) añaden contenedores auxiliares, y los de Docker/CVE usan Docker-in-Docker.
+
+| Lab | Carpeta | Tema | Técnicas clave |
+|-----|---------|------|----------------|
+| 54 | `54-servicio-caido-reinicio` | Servicio caído: arranque y reinicio | `systemctl`, `journalctl`, `Restart=` |
+| 55 | `55-disco-lleno` | Disco lleno al 100% | `df`, `du`, `lsof +L1` (ficheros borrados en uso) |
+| 56 | `56-app-no-llega-bd` | La app no llega a la base de datos | `ss`, `nc`, cortafuegos entre dos hosts |
+| 57 | `57-ssh-bastion` | SSH a través de un bastión | `ProxyJump`, llaves, `~/.ssh/config` |
+| 58 | `58-backup-blob-cron` | Backup a Blob storage por cron (3 AM) | `cron.d`, `rclone`, `flock`, rotación |
+| 59 | `59-restaurar-backup-bd` | Restaurar un backup de la BD | `pg_restore`, verificación de integridad |
+| 60 | `60-oom-killer` | El OOM killer mata el proceso | `dmesg`, `MemoryMax`, cgroups |
+| 61 | `61-dns-roto` | DNS interno roto | `resolv.conf`, `search`, `getent`, dnsmasq |
+| 62 | `62-502-bad-gateway` | 502 Bad Gateway en nginx | upstream, permisos, `proxy_read_timeout` |
+| 63 | `63-bucle-reinicios` | Bucle de reinicios | `NRestarts`, `EnvironmentFile`, `reset-failed` |
+| 64 | `64-healthcheck-autorrecuperacion` | Healthcheck y autorrecuperación | watchdog con timer, alerta |
+| 65 | `65-deploy-fallido-rollback` | Deploy fallido: rollback | releases, symlink atómico |
+| 66 | `66-too-many-open-files` | Too many open files | `LimitNOFILE`, `/proc/PID/limits` |
+| 67 | `67-postgres-conexiones-remotas` | PostgreSQL: conexiones remotas | `listen_addresses`, `pg_hba.conf`, scram |
+| 68 | `68-migracion-rsync` | Migración de datos con rsync | `rsync -aH --delete`, hardlinks, idempotencia |
+| 69 | `69-balanceador-backend-caido` | Balanceador con un backend caído | upstream, `max_fails`, `proxy_next_upstream` |
+| 70 | `70-cron-no-se-ejecuta` | El cron no se ejecuta | `cron.d`, campo de usuario, `%` escapado, newline |
+| 71 | `71-docker-logs-disco` | Logs de Docker llenan el disco | `json-file`, `max-size`, `max-file` (DinD) |
+| 72 | `72-certificado-caducado` | Certificado TLS caducado | `openssl ca`, `subjectAltName`, `nginx reload` |
+| 73 | `73-game-day-multifallo` | Game day: varias averías a la vez | triaje por capas, postmortem |
+| 74 | `74-escaneo-imagenes` | Escaneo de imágenes: a 0 CRITICAL | `grype`, CVE, imagen base (DinD) |
+| 75 | `75-rsyslog-centralizado` | Logs centralizados con rsyslog | `imtcp`, ruleset, cola en disco |
+| 76 | `76-dns-sinkhole` | Sinkhole DNS (estilo Pi-hole) | dnsmasq, feed de threat intel, `log-queries` |
+| 77 | `77-verificar-paquetes` | Verificar paquetes antes de instalar | `gpg --verify` + `VALIDSIG`, `SHA256SUMS` |
+| 78 | `78-iptables-a-nftables` | De iptables a nftables | `nftables`, set, `limit rate`, policy drop |
+
+Cada lab incluye `RETO.md`, `check.sh`, `solucion/SOLUCION.md` y `solucion/solve.sh`, igual que las demás pistas.

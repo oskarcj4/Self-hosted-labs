@@ -1,0 +1,11 @@
+[Unit]
+Description=TerminalCero Lab: prepara este servidor del escenario
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '[ -e /opt/node/.planted ] || { /opt/node/plant.sh > /var/log/tclab-node.log 2>&1 && touch /opt/node/.planted; }'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

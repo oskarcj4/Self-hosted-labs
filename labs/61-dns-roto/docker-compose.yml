@@ -1,0 +1,52 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-61
+    hostname: app-03
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    depends_on:
+      - dns
+      - pagos
+    networks:
+      lan:
+        ipv4_address: 10.76.61.10
+    ports:
+      - "127.0.0.1:7661:7681"   # terminal web (ttyd)
+
+  # Servidor DNS interno (dnsmasq) de la zona "interno".
+  dns:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: tc-lab-61-dns
+    hostname: dns-01
+    environment:
+      ROLE: dns
+    networks:
+      lan:
+        ipv4_address: 10.76.61.53
+
+  # API de pagos a la que llama la app.
+  pagos:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: tc-lab-61-pagos
+    hostname: pagos-01
+    environment:
+      ROLE: api
+    networks:
+      lan:
+        ipv4_address: 10.76.61.30
+
+networks:
+  lan:
+    ipam:
+      config:
+        - subnet: 10.76.61.0/24

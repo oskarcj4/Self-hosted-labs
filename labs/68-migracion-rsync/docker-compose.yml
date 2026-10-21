@@ -1,0 +1,38 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-68
+    hostname: new-srv
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    depends_on:
+      - old
+    networks:
+      lan:
+        ipv4_address: 10.76.68.10
+    ports:
+      - "127.0.0.1:7668:7681"   # terminal web (ttyd)
+
+  # Servidor que se retira: origen de la migración.
+  old:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: tc-lab-68-old
+    hostname: old-srv
+    networks:
+      lan:
+        ipv4_address: 10.76.68.20
+        aliases:
+          - old-srv
+
+networks:
+  lan:
+    ipam:
+      config:
+        - subnet: 10.76.68.0/24

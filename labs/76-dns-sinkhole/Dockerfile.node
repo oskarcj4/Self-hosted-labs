@@ -1,0 +1,8 @@
+# Lab 76 — DNS del proveedor y puestos de la oficina: contenedores mínimos sin terminal.
+FROM debian:12-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends dnsmasq \
+    && rm -rf /var/lib/apt/lists/*
+COPY setup-node/ /opt/node/
+RUN chmod 0755 /opt/node/node.sh
+CMD ["/opt/node/node.sh"]

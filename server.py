@@ -214,6 +214,82 @@ LABS = [
     ("53", "Día 30 · Limpiar la depuración de un incidente", "C", 2, ["Docker", "DevSecOps"],
      "Quedó un override con AUTH_BYPASS y una shell remota. Cierra el incidente de verdad.",
      ["compose.override", "--remove-orphans", "huérfanos"]),
+    # --- Pista D · Operaciones / SRE (producción) -------------------------
+    ("54", "Servicio caído: arranque y reinicio", "D", 1, ["SRE", "SysAdmin"],
+     "Una API no levanta tras el reinicio. Diagnostícala con systemd y déjala estable.",
+     ["systemctl", "journalctl", "Restart="]),
+    ("55", "Disco lleno al 100%", "D", 1, ["SRE", "SysAdmin"],
+     "El servidor no escribe: no queda espacio. Encuentra qué lo llena y recupéralo sin perder datos.",
+     ["df", "du", "lsof +L1"]),
+    ("56", "La app no llega a la base de datos", "D", 2, ["SRE", "Redes"],
+     "La web da error 500: no conecta con la BD de otra máquina. Sigue la conexión salto a salto.",
+     ["ss", "nc", "firewall"]),
+    ("57", "SSH a través de un bastión", "D", 2, ["SRE", "Redes"],
+     "Hay que llegar a un host interno sólo accesible por el bastión. Monta el salto con llaves.",
+     ["ProxyJump", "ssh-keygen", "~/.ssh/config"]),
+    ("58", "Backup a Blob storage por cron (3 AM)", "D", 2, ["SRE", "DevSecOps"],
+     "Deja un backup diario a las 3:00 a un almacén tipo Blob, con rotación y candado anti-solape.",
+     ["cron.d", "rclone", "flock"]),
+    ("59", "Restaurar un backup de la BD", "D", 2, ["SRE", "SysAdmin"],
+     "La tabla de pedidos se corrompió. Restaura desde el último dump y verifica la integridad.",
+     ["pg_restore", "verificación", "RPO"]),
+    ("60", "El OOM killer mata el proceso", "D", 2, ["SRE", "SysAdmin"],
+     "Un servicio muere solo cada rato. El kernel lo está matando por memoria. Acótalo.",
+     ["dmesg", "MemoryMax", "cgroups"]),
+    ("61", "DNS interno roto", "D", 2, ["SRE", "Redes"],
+     "La app no resuelve nombres internos. Arregla resolv.conf, el search y el servidor DNS.",
+     ["resolv.conf", "getent", "dnsmasq"]),
+    ("62", "502 Bad Gateway en nginx", "D", 2, ["SRE", "Redes"],
+     "El proxy devuelve 502 y luego 504. Alinea el upstream, los permisos y los timeouts.",
+     ["upstream", "proxy_read_timeout", "nginx"]),
+    ("63", "Bucle de reinicios", "D", 3, ["SRE", "SysAdmin"],
+     "Un worker reinicia sin parar hasta el start-limit. EnvironmentFile mal y un puerto ocupado.",
+     ["NRestarts", "EnvironmentFile", "reset-failed"]),
+    ("64", "Healthcheck y autorrecuperación", "D", 3, ["SRE", "SysAdmin"],
+     "Un servicio se cuelga sin morir. Escribe un watchdog que lo detecte, lo reinicie y alerte.",
+     ["timer", "watchdog", "RuntimeDirectory"]),
+    ("65", "Deploy fallido: rollback", "D", 3, ["SRE", "DevSecOps"],
+     "El último release no arranca y el rollback elige mal. Vuelve a la versión buena con symlinks.",
+     ["releases", "symlink atómico", "rollback"]),
+    ("66", "Too many open files", "D", 2, ["SRE", "SysAdmin"],
+     "Un servicio agota los descriptores. Sube el límite en el sitio correcto (no en limits.conf).",
+     ["LimitNOFILE", "/proc/PID/limits", "ulimit"]),
+    ("67", "PostgreSQL: conexiones remotas", "D", 2, ["SRE", "Redes"],
+     "La app remota no entra en Postgres. Ajusta listen_addresses y pg_hba sin abrirlo a todos.",
+     ["listen_addresses", "pg_hba.conf", "scram"]),
+    ("68", "Migración de datos con rsync", "D", 3, ["SRE", "SysAdmin"],
+     "Mueve un árbol de ficheros a otra máquina conservando permisos, enlaces y fechas. Idempotente.",
+     ["rsync -aH", "--delete", "hardlinks"]),
+    ("69", "Balanceador con un backend caído", "D", 3, ["SRE", "Redes"],
+     "Un backend cae y nginx sigue mandándole tráfico. Configura reintentos y health pasivo.",
+     ["upstream", "max_fails", "proxy_next_upstream"]),
+    ("70", "El cron no se ejecuta", "D", 2, ["SRE", "SysAdmin"],
+     "Cinco cronjobs, cinco motivos para no correr: campo de usuario, nombre, PATH, % y newline.",
+     ["cron.d", "journalctl", "%F"]),
+    ("71", "Logs de Docker llenan el disco", "D", 2, ["SRE", "Docker"],
+     "Un worker en DEBUG llena el disco con json.log. Rota los logs y déjalo en el compose.",
+     ["json-file", "max-size", "max-file"]),
+    ("72", "Certificado TLS caducado", "D", 2, ["SRE", "DevSecOps"],
+     "El certificado de la tienda caducó. Reemítelo con la CA interna (con SAN) y recarga en caliente.",
+     ["openssl ca", "subjectAltName", "nginx reload"]),
+    ("73", "Game day: varias averías a la vez", "D", 3, ["SRE", "SysAdmin"],
+     "Tres fallos simultáneos y 503. Triaje por capas, arregla sin perder datos y escribe el postmortem.",
+     ["triage", "journalctl", "postmortem"]),
+    ("74", "Escaneo de imágenes: a 0 CRITICAL", "D", 2, ["SRE", "DevSecOps", "Docker"],
+     "El gate bloquea la imagen por CVE CRITICAL. Escanéala con grype y arregla la base.",
+     ["grype", "CVE", "imagen base"]),
+    ("75", "Logs centralizados con rsyslog", "D", 3, ["SRE", "Redes"],
+     "Faltan logs de un host y se pierden en cada caída. Centraliza por TCP con cola en disco.",
+     ["rsyslog", "imtcp", "cola en disco"]),
+    ("76", "Sinkhole DNS (estilo Pi-hole)", "D", 3, ["SRE", "Redes", "DevSecOps"],
+     "Un puesto habla con un C2. Monta un sinkhole desde un feed y localiza al infectado por los logs.",
+     ["dnsmasq", "threat intel", "log-queries"]),
+    ("77", "Verificar paquetes antes de instalar", "D", 3, ["SRE", "DevSecOps"],
+     "El mirror está comprometido. Instala sólo lo que firme el fabricante: firma GPG y SHA-256.",
+     ["gpg --verify", "VALIDSIG", "SHA256SUMS"]),
+    ("78", "De iptables a nftables", "D", 2, ["SRE", "Redes", "DevSecOps"],
+     "Migra un cortafuegos iptables de 2015 a nftables: deny por defecto, SSH acotado, sin reglas muertas.",
+     ["nftables", "set", "limit rate"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
@@ -225,6 +301,10 @@ LAB_CURSOS = {
     "12": ["03", "09", "10"], "13": ["03", "09"], "14": ["03", "09", "11"],
     "15": ["02"], "16": ["08"], "17": ["12"], "18": ["11"], "19": ["10", "12"],
     "20": ["09", "11"], "21": ["12", "13"], "22": ["09"], "23": ["04", "05"],
+    # Pista D
+    "56": ["11"], "57": ["12"], "58": ["10", "12"], "61": ["11"], "62": ["11"],
+    "67": ["11"], "72": ["12", "13"], "74": ["10"], "75": ["09"], "76": ["10", "11"],
+    "77": ["13"], "78": ["11"],
 }
 ID_RE = re.compile(r"^\d{2}$")
 
@@ -423,8 +503,11 @@ def read_md(lab_id, kind):
     d = lab_dir(lab_id)
     if not d:
         return None
+    # RETO.md va dentro del contenedor; solución y guía viven en solucion/,
+    # que nunca se copia a la imagen.
     path = os.path.join(d, "RETO.md") if kind == "reto" \
-        else os.path.join(d, "solucion", "SOLUCION.md")
+        else os.path.join(d, "solucion",
+                          "GUIA.md" if kind == "guia" else "SOLUCION.md")
     try:
         with open(path, encoding="utf-8") as f:
             return f.read()
@@ -546,7 +629,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "no disponible"}, 404)
             with open(cp, encoding="utf-8") as f:
                 return self._json({"markdown": f.read()})
-        m = re.match(r"^/api/labs/(\d{2})/(reto|solucion)$", path)
+        m = re.match(r"^/api/labs/(\d{2})/(reto|solucion|guia)$", path)
         if m:
             lab_id, kind = m.group(1), m.group(2)
             txt = read_md(lab_id, kind)

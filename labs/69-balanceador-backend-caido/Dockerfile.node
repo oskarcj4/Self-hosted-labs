@@ -1,0 +1,6 @@
+# Lab 69 — app1/app2/app3: backends mínimos detrás del balanceador (sin terminal web).
+FROM debian:12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends python3 \
+    && rm -rf /var/lib/apt/lists/*
+COPY setup-node/backend.py /opt/backend.py
+CMD ["python3", "/opt/backend.py"]
