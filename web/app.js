@@ -164,7 +164,7 @@ function runningPanelHTML() {
       <span class="running__cats">${catsHTML(l)}</span>
       <span class="running__actions">
         <button class="btn btn--sm" data-open="${l.id}">Abrir</button>
-        <a class="btn btn--sm" href="http://localhost:${l.ttydPort}" target="_blank" rel="noopener">Terminal ↗</a>
+        <button class="btn btn--sm" data-popout="${l.id}">Terminal ↗</button>
         <button class="btn btn--sm btn--danger" data-stop="${l.id}">■ Detener</button>
       </span>
     </div>`).join("")}
@@ -174,6 +174,8 @@ function runningPanelHTML() {
 
 function bindRunningPanel(root) {
   root.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => renderDetail(b.dataset.open)));
+  root.querySelectorAll("[data-popout]").forEach((b) => b.addEventListener("click", () =>
+    popOut(STATE.labs.find((x) => x.id === b.dataset.popout))));
   root.querySelectorAll("[data-stop]").forEach((b) => b.addEventListener("click", async () => {
     b.disabled = true;
     b.innerHTML = '<span class="spinner"></span> Deteniendo…';
@@ -185,6 +187,7 @@ function bindRunningPanel(root) {
 async function stopLab(id) {
   const l = STATE.labs.find((x) => x.id === id);
   if (l) l.stopping = true;
+  closePopout(id, true); // stopLab siempre viene de un clic
   try { await api(`/api/labs/${id}/stop`, "POST"); } catch (e) { toast("Error: " + e.message); }
   await refreshRunning();
   if (l) l.stopping = false;
@@ -243,6 +246,13 @@ function tick() {
     if (l && l.expiresIn != null) el.textContent = fmtSecs(l.expiresIn);
   });
   if (STATE.labs.some((l) => l.destroyIn === 0)) refreshRunning();
+  // El usuario cerró la pestaña de la terminal: la shell vuelve a esta página.
+  Object.keys(POPOUTS).forEach((id) => {
+    if (!POPOUTS[id].closed) return;
+    delete POPOUTS[id];
+    const l = STATE.labs.find((x) => x.id === id);
+    if (l && STATE.view === id && termVisible()) mountTerminal(l);
+  });
 }
 
 /* Pide los labs activos al backend y actualiza toda la UI que depende de ello. */
@@ -257,6 +267,7 @@ async function refreshRunning() {
     if (l.running !== r) {
       // Estaba corriendo y desapareció sin pulsar Detener: lo destruyó el backend.
       if (l.running && !r && !l.stopping) toast(`Lab ${l.id} autodestruido`);
+      if (!r) closePopout(l.id);
       l.running = r; changed = true;
     }
     const lc = life[l.id] || {};
@@ -369,6 +380,7 @@ function route() {
 
 /* Resalta en el nav "Cursos" o el filtro de pista activo. */
 function setNav(section) {
+  view.classList.remove("container--wide"); // solo la pestaña Terminal usa el ancho completo
   document.querySelectorAll(".chip[data-filter]").forEach((x) =>
     x.setAttribute("aria-pressed", section !== "cursos" && x.dataset.filter === STATE.filter));
   const c = document.querySelector('.chip[data-route="cursos"]');
@@ -510,7 +522,22 @@ async function renderDetail(id) {
       <button class="tab" role="tab" data-panel="sol">Solución</button>
     </div>
     <div class="panel active" data-panel="reto"><div class="md" id="mdReto">Cargando…</div></div>
-    <div class="panel" data-panel="term"><div id="termSlot"></div></div>
+    <div class="panel" data-panel="term">
+      <div class="workspace${briefHidden() ? " workspace--nobrief" : ""}" id="workspace">
+        <aside class="brief" aria-label="Enunciado del reto">
+          <div class="brief__head">
+            <span class="brief__label">Enunciado · LAB ${l.id}</span>
+            <button class="linkbtn" data-brief-check title="Validar la solución">✓ Validar</button>
+            <button class="linkbtn" data-brief-toggle title="Ocultar enunciado">Ocultar ⇤</button>
+          </div>
+          <div class="brief__scroll">
+            <pre class="output" id="briefCheck" hidden></pre>
+            <div class="md brief__body" id="mdBrief">Cargando…</div>
+          </div>
+        </aside>
+        <div class="workspace__term" id="termSlot"></div>
+      </div>
+    </div>
     <div class="panel" data-panel="check"><p class="empty" id="checkEmpty">Pulsa <strong>Validar</strong> con el lab activo para ver el resultado.</p><pre class="output" id="checkOut" style="display:none"></pre></div>
     <div class="panel" data-panel="sol"><div class="md" id="mdSol">Cargando…</div></div>
   `;
@@ -522,11 +549,18 @@ async function renderDetail(id) {
   tabs.forEach((t) => t.addEventListener("click", () => {
     tabs.forEach((x) => x.setAttribute("aria-selected", x === t));
     view.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === t.dataset.panel));
+    view.classList.toggle("container--wide", t.dataset.panel === "term");
     if (t.dataset.panel === "term") mountTerminal(l);
   }));
+  view.querySelector("[data-brief-toggle]").addEventListener("click", () => toggleBrief(false));
+  view.querySelector("[data-brief-check]").addEventListener("click", () => view.querySelector("#btnCheck").click());
 
-  // contenido markdown
-  api(`/api/labs/${id}/reto`).then((d) => { view.querySelector("#mdReto").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; });
+  // contenido markdown (el enunciado va también al lateral de la pestaña Terminal)
+  api(`/api/labs/${id}/reto`).then((d) => {
+    const html = d.markdown ? md(d.markdown) : "No disponible.";
+    view.querySelector("#mdReto").innerHTML = html;
+    view.querySelector("#mdBrief").innerHTML = html;
+  });
   api(`/api/labs/${id}/solucion`).then((d) => { view.querySelector("#mdSol").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
     .catch(() => { view.querySelector("#mdSol").textContent = "No disponible."; });
 
@@ -557,9 +591,11 @@ async function renderDetail(id) {
     else showCheck(r.output, false);
   });
   bind("#btnReset", "Reiniciando…", "reset", (r) => { toast(r.ok ? "Escenario re-plantado" : "Fallo al reiniciar"); });
-  bind("#btnStop", "Deteniendo…", "stop", (r) => { toast("Lab detenido y destruido"); l.running = false; l.destroyIn = null; clearTerminal(l); });
+  bind("#btnStop", "Deteniendo…", "stop", (r) => { toast("Lab detenido y destruido"); closePopout(l.id); l.running = false; l.destroyIn = null; clearTerminal(l); });
   bind("#btnCheck", "Validando…", "check", (r) => {
-    switchTab("check"); showCheck(r.output || "(sin salida)", r.ok);
+    // Desde la terminal no se cambia de pestaña: el resultado sale encima del enunciado.
+    if (!termVisible()) switchTab("check");
+    showCheck(r.output || "(sin salida)", r.ok);
     toast(r.ok ? "¡Resuelto! 🎉" : "Aún faltan objetivos");
     if (r.ok) { l.destroyIn = r.destroyIn; renderLifeBanner(); updateRunningUI(true); }
   });
@@ -582,6 +618,13 @@ function showCheck(text, ok) {
   out.style.display = "block";
   out.textContent = text;
   out.className = "output " + (ok ? "ok" : "fail");
+  const brief = view.querySelector("#briefCheck");
+  if (brief) {
+    brief.hidden = false;
+    brief.textContent = text;
+    brief.className = out.className;
+    brief.parentElement.scrollTop = 0; // el resultado está arriba del lateral
+  }
 }
 
 async function refreshStatus(l) {
@@ -601,20 +644,114 @@ async function refreshStatus(l) {
   } catch (_) {}
 }
 
+/* ---------- terminal ---------- */
+const termVisible = () => !!view.querySelector(".panel[data-panel='term'].active");
+
+/* Lateral con el enunciado: se puede ocultar para dar todo el ancho a la shell. */
+function briefHidden() {
+  try { return localStorage.getItem("tc-brief") === "hidden"; } catch { return false; }
+}
+function toggleBrief(show) {
+  const ws = view.querySelector("#workspace");
+  if (!ws) return;
+  ws.classList.toggle("workspace--nobrief", !show);
+  try { localStorage.setItem("tc-brief", show ? "shown" : "hidden"); } catch {}
+}
+
+/* Terminal abierta en otra pestaña del navegador, por lab. Mientras esa pestaña
+   exista no se monta el iframe: la shell está en un solo sitio, nunca en los dos.
+   Valor: la ventana, o "lost" si se recargó esta página y aún no se recuperó la referencia. */
+const POPOUTS = {};
+
+function savePopouts() {
+  try { sessionStorage.setItem("tc-popouts", Object.keys(POPOUTS).join(",")); } catch {}
+}
+function loadPopouts() {
+  let ids = "";
+  try { ids = sessionStorage.getItem("tc-popouts") || ""; } catch {}
+  // solo las de labs que siguen activos: la de un lab destruido ya no tiene shell
+  ids.split(",").filter((id) => STATE.labs.some((l) => l.id === id && l.running))
+    .forEach((id) => { POPOUTS[id] = "lost"; });
+  savePopouts();
+}
+
+function popoutOf(id) {
+  const w = POPOUTS[id];
+  if (w === "lost" || (w && !w.closed)) return w;
+  if (w) { delete POPOUTS[id]; savePopouts(); }
+  return null;
+}
+
+/* Recupera la pestaña por su nombre (solo con un clic: si no, el navegador lo bloquea).
+   Si ya no existía, window.open crea una en blanco: se cierra y se devuelve null. */
+function reattach(id) {
+  const w = window.open("", `tc-term-${id}`);
+  if (!w) return null;
+  let blank = false;
+  try { blank = w.location.href === "about:blank"; } catch { /* origen de ttyd: la pestaña existía */ }
+  if (blank) { w.close(); return null; }
+  return w;
+}
+
+function popOut(l) {
+  let w = popoutOf(l.id);
+  if (w === "lost") w = reattach(l.id);
+  // window.open con el mismo nombre trae al frente la pestaña ya abierta sin recargarla
+  if (w) { if (w !== POPOUTS[l.id]) POPOUTS[l.id] = w; window.open("", `tc-term-${l.id}`); return; }
+  w = window.open(`http://localhost:${l.ttydPort}`, `tc-term-${l.id}`);
+  if (!w) { toast("El navegador bloqueó la pestaña nueva"); delete POPOUTS[l.id]; savePopouts(); return; }
+  POPOUTS[l.id] = w;
+  savePopouts();
+  if (STATE.view === l.id) mountTerminal(l); // quita el iframe de esta página
+}
+
+/* gesture: se llama desde un clic, así que se puede recuperar una pestaña "lost". */
+function closePopout(id, gesture = false) {
+  let w = popoutOf(id);
+  if (w === "lost") w = gesture ? reattach(id) : null;
+  if (w) w.close();
+  delete POPOUTS[id];
+  savePopouts();
+}
+
+function termBarHTML(l, right) {
+  return `<div class="term-bar">
+    <button class="linkbtn" data-brief-toggle title="Mostrar enunciado">⇥ Enunciado</button>
+    <span>● analista@lab-${l.id}</span><span style="flex:1"></span>${right}
+  </div>`;
+}
+
 function mountTerminal(l) {
   const slot = view.querySelector("#termSlot");
   if (!slot) return;
   if (!l.running) {
-    slot.innerHTML = `<div class="term-wrap"><div class="term-off">El contenedor no está activo.<br>Pulsa <strong>▶ Iniciar</strong> para abrir la terminal.</div></div>`;
-    return;
+    slot.dataset.url = "";
+    slot.innerHTML = `<div class="term-wrap">${termBarHTML(l, "")}<div class="term-off">El contenedor no está activo.<br>Pulsa <strong>▶ Iniciar</strong> para abrir la terminal.</div></div>`;
+  } else {
+    const url = `http://localhost:${l.ttydPort}`;
+    const popped = !!popoutOf(l.id);
+    const key = popped ? "popout" : url;
+    if (slot.dataset.url === key) return; // ya montado
+    slot.dataset.url = key;
+    slot.innerHTML = popped
+      ? `<div class="term-wrap">${termBarHTML(l, "")}<div class="term-off">
+          <p class="term-off__msg"><strong>La terminal está abierta en otra pestaña del navegador.</strong><br>
+          Sigue el enunciado aquí y trabaja allí. Para volver a tenerla en esta página, cierra esa pestaña o pulsa <strong>Traer aquí</strong>.</p>
+          <div class="term-off__actions">
+            <button class="btn btn--sm" data-term="focus">Ir a la pestaña ↗</button>
+            <button class="btn btn--sm btn--primary" data-term="back">⇤ Traer aquí</button>
+          </div>
+          <p class="term-off__note">Al traerla se cierra esa pestaña y se abre una sesión nueva: los ficheros del lab se conservan, el historial y las variables de la shell no.</p>
+        </div></div>`
+      : `<div class="term-wrap">${termBarHTML(l, `<button class="linkbtn" data-term="popout">abrir en pestaña ↗</button>`)}
+          <iframe src="${url}" title="Terminal del lab ${l.id}" allow="clipboard-read; clipboard-write"></iframe>
+        </div>`;
+    const act = (name, fn) => { const b = slot.querySelector(`[data-term="${name}"]`); if (b) b.addEventListener("click", fn); };
+    act("popout", () => popOut(l));
+    act("focus", () => popOut(l));
+    act("back", () => { closePopout(l.id, true); mountTerminal(l); });
   }
-  const url = `http://localhost:${l.ttydPort}`;
-  if (slot.dataset.url === url) return; // ya montado
-  slot.dataset.url = url;
-  slot.innerHTML = `<div class="term-wrap">
-      <div class="term-bar"><span>● analista@lab-${l.id}</span><span style="flex:1"></span><a href="${url}" target="_blank" rel="noopener" style="color:var(--fg-muted)">abrir en pestaña ↗</a></div>
-      <iframe src="${url}" title="Terminal del lab ${l.id}" allow="clipboard-read; clipboard-write"></iframe>
-    </div>`;
+  slot.querySelector("[data-brief-toggle]").addEventListener("click", () => toggleBrief(true));
 }
 
 function clearTerminal(l) {
@@ -664,6 +801,7 @@ async function boot() {
     ]);
     STATE.labs = d.labs;
     STATE.cursos = c.cursos || [];
+    loadPopouts(); // pestañas de terminal abiertas antes de recargar
     route(); // abre directamente la vista de la URL (p.ej. /#cursos)
     initPolling();
   } catch (e) {
