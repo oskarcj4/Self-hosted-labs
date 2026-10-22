@@ -2,7 +2,7 @@
 "use strict";
 
 const view = document.getElementById("view");
-const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)" };
+const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)" };
 let STATE = { labs: [], cursos: [], filter: "all", view: "home" };
 const POLL_MS = 8000; // refresco de "labs en ejecución"
 
@@ -462,7 +462,7 @@ function renderHome() {
   setHash("");
   setNav("home");
   const labs = STATE.labs.filter((l) => STATE.filter === "all" || l.track === STATE.filter);
-  const byTrack = { A: [], B: [], C: [], D: [] };
+  const byTrack = { A: [], B: [], C: [], D: [], E: [] };
   labs.forEach((l) => byTrack[l.track].push(l));
   const trackHTML = (t) => (STATE.filter === "all" || STATE.filter === t)
     ? `<div class="section-label">${TRACKS[t]}</div>
@@ -479,6 +479,7 @@ function renderHome() {
     ${trackHTML("B")}
     ${trackHTML("C")}
     ${trackHTML("D")}
+    ${trackHTML("E")}
   `;
 
   bindRunningPanel(view.querySelector("#runningSlot"));

@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-82
+    hostname: web-82
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7682:7681"   # terminal web (ttyd)
