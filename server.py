@@ -51,7 +51,8 @@ REAP_EVERY_S = 10
 
 # Registro de labs. Única fuente de verdad de metadatos; el contenido (RETO.md,
 # SOLUCION.md) se lee del disco. 'track': A = detección/respuesta, B = hardening,
-# C = 30 días de DevSecOps. 'cats': categorías visibles en la tarjeta (DevSecOps,
+# C = 30 días de DevSecOps, D = operaciones/SRE, E = defensa anti-DDoS/DoS.
+# 'cats': categorías visibles en la tarjeta (DevSecOps,
 # DevOps, SysAdmin, Redes, Forense, Pentest, Docker). 'desc': resumen de una línea para la tarjeta.
 LABS = [
     ("01", "Intruso SSH persistente", "A", 2, ["DevSecOps"],
@@ -290,6 +291,25 @@ LABS = [
     ("78", "De iptables a nftables", "D", 2, ["SRE", "Redes", "DevSecOps"],
      "Migra un cortafuegos iptables de 2015 a nftables: deny por defecto, SSH acotado, sin reglas muertas.",
      ["nftables", "set", "limit rate"]),
+    # --- Pista E · Defensa anti-DDoS/DoS (lado azul) ----------------------
+    ("79", "Triage anti-DDoS: ¿ataque o tráfico legítimo?", "E", 2, ["DevSecOps", "Redes", "Forense"],
+     "Un pico enorme de peticiones. Separa el flood distribuido del health check y los crawlers antes de bloquear.",
+     ["access.log", "awk/uniq", "/24", "falsos positivos"]),
+    ("80", "Endurecer Apache contra un flood HTTP", "E", 2, ["DevSecOps", "SysAdmin"],
+     "Apache con la config aflojada cae ante un flood. Ponle reqtimeout, Timeout bajos y mod_evasive.",
+     ["mod_reqtimeout", "mod_evasive", "KeepAlive", "ab"]),
+    ("81", "Mitigar Slowloris (slow-DoS)", "E", 3, ["DevSecOps", "Redes"],
+     "Pocas conexiones lentas agotan los workers de Apache. Córtalas con mod_reqtimeout.",
+     ["slowloris", "RequestReadTimeout", "MinRate"]),
+    ("82", "WAF: ModSecurity + OWASP CRS", "E", 3, ["DevSecOps"],
+     "ModSecurity está en sólo-detectar y sin reglas. Ponlo en bloqueo y carga el Core Rule Set.",
+     ["SecRuleEngine", "OWASP CRS", "WAF", "capa 7"]),
+    ("83", "Reverse proxy con rate limiting (nginx)", "E", 2, ["Redes", "DevSecOps"],
+     "nginx hace de proxy sin límite de tasa. Pon un limit_req por IP (el equivalente local a una CDN).",
+     ["limit_req_zone", "burst", "proxy_pass", "token bucket"]),
+    ("84", "Respuesta a incidentes tras un DDoS", "E", 2, ["DevSecOps", "SysAdmin", "Forense"],
+     "El flood amainó. Cierra el incidente: mitigación duradera en el firewall y postmortem.",
+     ["iptables hashlimit", "blocklist", "postmortem"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
@@ -305,6 +325,9 @@ LAB_CURSOS = {
     "56": ["11"], "57": ["12"], "58": ["10", "12"], "61": ["11"], "62": ["11"],
     "67": ["11"], "72": ["12", "13"], "74": ["10"], "75": ["09"], "76": ["10", "11"],
     "77": ["13"], "78": ["11"],
+    # Pista E · anti-DDoS (curso 14)
+    "79": ["14", "09"], "80": ["14"], "81": ["14"], "82": ["14", "13"],
+    "83": ["14", "11"], "84": ["14", "11", "09"],
 }
 ID_RE = re.compile(r"^\d{2}$")
 

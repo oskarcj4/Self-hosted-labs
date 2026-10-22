@@ -122,3 +122,20 @@ Casos reales de operaciones: diagnóstico de servicios, redes, almacenamiento, d
 | 78 | `78-iptables-a-nftables` | De iptables a nftables | `nftables`, set, `limit rate`, policy drop |
 
 Cada lab incluye `RETO.md`, `check.sh`, `solucion/SOLUCION.md` y `solucion/solve.sh`, igual que las demás pistas.
+
+---
+
+# Pista E — Defensa anti-DDoS/DoS (labs 79–84)
+
+Lado azul: distinguir un flood malicioso del tráfico legítimo de alto volumen y mitigar por capas (kernel, firewall, Apache, WAF, reverse proxy, CDN). Todo el tráfico se genera **en local** contra el propio contenedor (`ab`, probador incluido), nunca contra terceros. Acompaña al curso [14 · DDoS: defensa en profundidad](cursos/14-ddos-defensa-en-profundidad.md). Inspirado en la lección Mirai del catálogo (botnet, DDoS a Dyn).
+
+| Lab | Carpeta | Tema | Técnicas clave |
+|-----|---------|------|----------------|
+| 79 | `79-ddos-triage` | Triage: ¿ataque o tráfico legítimo? | `awk`/`uniq`, agrupar por /24, User-Agent, falsos positivos (health check, crawler, NAT) |
+| 80 | `80-apache-anti-dos` | Endurecer Apache contra un flood HTTP | `mod_reqtimeout`, `mod_evasive`, `Timeout`/`KeepAliveTimeout`, `ab` |
+| 81 | `81-slowloris` | Mitigar Slowloris (slow-DoS) | `RequestReadTimeout header=...,MinRate=...`, probador acotado a localhost |
+| 82 | `82-waf-modsecurity` | WAF: ModSecurity + OWASP CRS | `SecRuleEngine On`, CRS, bloqueo de SQLi (403), capa 7 |
+| 83 | `83-reverse-proxy-ratelimit` | Reverse proxy con rate limiting (nginx) | `limit_req_zone`, `limit_req burst=... nodelay`, token bucket, equivalente local a una CDN |
+| 84 | `84-ir-postmortem-ddos` | Respuesta a incidentes tras un DDoS | `iptables hashlimit`/blocklist, postmortem blameless |
+
+> Nota sobre Cloudflare: es una CDN/WAF *alojada*, no corre en un contenedor. El lab 83 monta el equivalente local que sí controlas (reverse proxy con rate limiting); el curso 14 explica cuándo hace falta una CDN de verdad (floods volumétricos que saturan tu ancho de banda de entrada).
