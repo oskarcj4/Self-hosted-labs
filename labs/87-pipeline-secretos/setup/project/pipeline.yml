@@ -1,0 +1,10 @@
+name: shop-deploy
+# Un PR de un fork no debería recibir secretos de producción.
+on: [push, pull_request]
+env:
+  DEPLOY_TOKEN: "tclab-live-token-do-not-commit"
+jobs:
+  build:
+    run: bash jobs/build.sh
+  deploy:
+    run: bash jobs/deploy.sh

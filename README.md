@@ -10,7 +10,7 @@
 
 # 💸 Adiós a las plataformas que te cobran una fortuna por aprender hacking
 
-### 78 laboratorios reales de DevSecOps, SRE, respuesta a incidentes y hardening.<br>En tu máquina. Gratis. Con un solo comando.
+### 101 laboratorios reales de DevSecOps, SRE, respuesta a incidentes y hardening.<br>En tu máquina. Gratis. Con un solo comando.
 
 ```bash
 python server.py
@@ -174,6 +174,36 @@ se resuelve y se valida con `check.sh`.
 | 64 | Healthcheck y autorrecuperación | | 77 | Verificar paquetes antes de instalar |
 | 65 | Deploy fallido: rollback | | 78 | De iptables a nftables |
 | 66 | Too many open files | | | |
+
+### 🛡️ Pista F — Pipeline CI y runtime Docker (85–96)
+
+Gates de pipeline, parches sin downtime y endurecimiento del runtime: lo que
+falta entre “la app funciona” y “no se escapa al host”. 85–86 van sobre Debian
+con systemd y nginx; 87–96 traen Docker-in-Docker.
+
+| # | Lab | | # | Lab |
+|---|---|---|---|---|
+| 85 | Parche rolling sin downtime | | 91 | Admission: política de Compose |
+| 86 | Cutover blue-green | | 92 | SBOM firmado y verificado |
+| 87 | Pipeline CI que filtra secretos | | 93 | Scan IaC del Compose |
+| 88 | Gate de seguridad saltado | | 94 | xtrace que filtra el secreto |
+| 89 | Capabilities y no-new-privileges | | 95 | seccomp: perfil propio |
+| 90 | Cerrar vías de escape al host | | 96 | Actions sin pin de SHA |
+
+### 🕹️ Pista G — AppSec web, red o blue (97–101)
+
+Apps web vulnerables a propósito, al estilo de las máquinas fácil/media de Hack
+The Box. Cada una se resuelve de **dos formas**: la hackeas y capturas la flag
+(🔴 red) o arreglas el fallo (🔵 blue). El validador acepta cualquiera de las dos.
+Las soluciones que se incluyen son **solo las del arreglo**.
+
+| # | Lab | OWASP |
+|---|---|---|
+| 97 | Portal con SQLi en el login | A03 |
+| 98 | Command injection en herramienta de red | A03 |
+| 99 | Gateway con SSRF al metadata interno | A10 |
+| 100 | API con JWT `alg:none` | A07 |
+| 101 | Importador XML con XXE | A05 |
 
 ### 📚 Teoría de apoyo
 

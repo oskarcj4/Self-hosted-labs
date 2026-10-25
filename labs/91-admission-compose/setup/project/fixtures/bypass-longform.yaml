@@ -1,0 +1,9 @@
+# Red team #2: no aparece "docker.sock", pero el socket está dentro de /var/run.
+name: rt2
+services:
+  x:
+    image: python:3.12-alpine
+    volumes:
+      - type: bind
+        source: /var/run
+        target: /hostrun

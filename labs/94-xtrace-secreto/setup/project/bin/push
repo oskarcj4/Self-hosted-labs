@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Cliente del registro de despliegues (simulado). No lo modifiques.
+# Uso: bin/push <fichero-cabecera>   |   ... | bin/push -
+# La cabecera es una línea "Authorization: Bearer <token>".
+set -euo pipefail
+src="${1:?uso: bin/push <fichero|->}"
+if [ "$src" = "-" ]; then hdr=$(head -n1); else hdr=$(head -n1 "$src"); fi
+tok="${hdr#Authorization: Bearer }"
+if [ "$(printf '%s' "$tok" | sha256sum | cut -d' ' -f1)" = "$(cat /etc/ci/token.sha256)" ]; then
+  echo "push ok"
+else
+  echo "push: 401 token inválido" >&2
+  exit 1
+fi

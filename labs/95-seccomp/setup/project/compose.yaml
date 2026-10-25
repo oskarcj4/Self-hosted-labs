@@ -1,0 +1,12 @@
+name: seccomp
+
+services:
+  api:
+    image: shop/api:1.0
+    build: ./api
+    # "Si no, un syscall raro petaba en 2019"
+    security_opt:
+      - seccomp:unconfined
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

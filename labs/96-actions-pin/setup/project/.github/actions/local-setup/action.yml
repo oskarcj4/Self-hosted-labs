@@ -1,0 +1,7 @@
+name: local-setup
+description: Acción local del propio repo (viaja con tu commit).
+runs:
+  using: composite
+  steps:
+    - run: echo "setup local"
+      shell: bash

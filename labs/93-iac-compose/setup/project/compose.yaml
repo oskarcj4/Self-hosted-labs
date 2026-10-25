@@ -1,0 +1,12 @@
+name: iac
+
+# PR #301 "scan en verde": quitado :latest, añadido user:, privileged parametrizado.
+services:
+  api:
+    image: shop/api
+    build: ./api
+    user: "0"
+    privileged: ${API_PRIV:-true}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

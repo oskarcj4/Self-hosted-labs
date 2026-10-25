@@ -1,0 +1,9 @@
+name: evil
+services:
+  x:
+    image: python:3.12-alpine
+    privileged: true
+    pid: host
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

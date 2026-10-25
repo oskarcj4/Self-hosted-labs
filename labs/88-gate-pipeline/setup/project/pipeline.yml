@@ -1,0 +1,9 @@
+name: shop-gate
+# El scan "molestaba" al deploy, así que se dejó en continue-on-error
+# y el deploy no lo espera.
+jobs:
+  secret-scan:
+    continue-on-error: true
+    run: bash jobs/secret-scan.sh
+  deploy:
+    run: bash jobs/deploy.sh

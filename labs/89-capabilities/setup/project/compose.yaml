@@ -1,0 +1,13 @@
+name: caps
+
+services:
+  api:
+    image: shop/api:1.0
+    build: ./api
+    # Copiado de un "tuneo de red" que nunca se usó
+    cap_add:
+      - ALL
+      - SYS_ADMIN
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

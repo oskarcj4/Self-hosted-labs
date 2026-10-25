@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-97
+    hostname: portal-97
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7697:7681"   # terminal web (ttyd)

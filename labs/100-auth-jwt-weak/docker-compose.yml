@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-100
+    hostname: api-100
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:7700:7681"

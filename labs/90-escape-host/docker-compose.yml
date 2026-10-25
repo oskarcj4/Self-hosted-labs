@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-90
+    hostname: edge-host
+    privileged: true      # Docker-in-Docker: el lab tiene su propio dockerd
+    init: true
+    ports:
+      - "127.0.0.1:7690:7681"   # terminal web (ttyd)

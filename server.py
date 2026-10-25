@@ -51,7 +51,8 @@ REAP_EVERY_S = 10
 
 # Registro de labs. Única fuente de verdad de metadatos; el contenido (RETO.md,
 # SOLUCION.md) se lee del disco. 'track': A = detección/respuesta, B = hardening,
-# C = 30 días de DevSecOps, D = operaciones/SRE, E = defensa anti-DDoS/DoS.
+# C = 30 días de DevSecOps, D = operaciones/SRE, E = defensa anti-DDoS/DoS,
+# F = pipeline CI y runtime Docker.
 # 'cats': categorías visibles en la tarjeta (DevSecOps,
 # DevOps, SysAdmin, Redes, Forense, Pentest, Docker). 'desc': resumen de una línea para la tarjeta.
 LABS = [
@@ -310,6 +311,60 @@ LABS = [
     ("84", "Respuesta a incidentes tras un DDoS", "E", 2, ["DevSecOps", "SysAdmin", "Forense"],
      "El flood amainó. Cierra el incidente: mitigación duradera en el firewall y postmortem.",
      ["iptables hashlimit", "blocklist", "postmortem"]),
+    # --- Pista F · Pipeline CI y runtime Docker -----------------------------
+    ("85", "Parche rolling sin downtime", "F", 3, ["DevSecOps", "SRE"],
+     "Hay que subir shop 1.0.0 → 1.2.0 detrás del balanceador sin cortar HTTP ni reiniciar nginx.",
+     ["rolling", "reload", "health", "dos backends"]),
+    ("86", "Cutover blue-green", "F", 3, ["DevSecOps", "SRE"],
+     "Green sigue en 1.0.0 vulnerable. Blue ya está parcheado: cambia el upstream y recarga en caliente.",
+     ["blue-green", "upstream", "nginx reload", "rollback"]),
+    ("87", "Pipeline CI que filtra secretos", "F", 3, ["DevSecOps", "Docker"],
+     "El runner imprime el token, monta docker.sock y corre en pull_request. Endurécelo sin romper el build.",
+     ["CI", "secretos", "docker.sock", "pull_request"]),
+    ("88", "Gate de seguridad saltado", "F", 3, ["DevSecOps"],
+     "El job de scan está en continue-on-error y el deploy no lo espera. El gate tiene que ser obligatorio y verde.",
+     ["pipeline", "needs", "continue-on-error", "scan"]),
+    ("89", "Capabilities y no-new-privileges", "F", 2, ["Docker", "DevSecOps"],
+     "La API arranca con CAP_ALL y SYS_ADMIN. Déjala en cap_drop ALL y no-new-privileges, sirviendo igual.",
+     ["cap_drop", "no-new-privileges", "least privilege"]),
+    ("90", "Cerrar vías de escape al host", "F", 3, ["Docker", "DevSecOps"],
+     "privileged, pid/net host, docker.sock y / del host. Quita las vías de escape y deja la API con su volumen de datos.",
+     ["privileged", "docker.sock", "pid: host", "bind /"]),
+    ("91", "Admission: política de Compose", "F", 3, ["DevSecOps", "Docker"],
+     "El admitidor es un grep y red team tiene 12 bypasses. Evalúa el compose renderizado, fail-closed, y engánchalo al deploy.",
+     ["admission", "policy as code", "compose config", "fail-closed"]),
+    ("92", "SBOM firmado y verificado", "F", 3, ["DevSecOps", "Docker"],
+     "El gate de release está en verde con una clave que trajo el atacante. Ancla de confianza, SBOM real y atado a la imagen.",
+     ["SBOM", "firma", "ancla de confianza", "supply chain"]),
+    ("93", "Scan IaC del Compose", "F", 3, ["DevSecOps", "Docker"],
+     "Un PR puso el scan en verde esquivando el grep. Arregla el escáner contra un corpus de casos y luego el compose.",
+     ["IaC", "scanner", "falsos negativos", "tests"]),
+    ("94", "xtrace que filtra el secreto", "F", 3, ["DevSecOps"],
+     "El token sale por xtrace escondido, base64 y artefactos. Ciérralas y enmascara secretos en el runner.",
+     ["set -x", "masking", "artefactos", "CI"]),
+    ("95", "seccomp: perfil propio", "F", 3, ["Docker", "DevSecOps"],
+     "La api corre unconfined. Deriva del perfil de Docker uno que niegue ptrace y process_vm_* y pruébalo en runtime.",
+     ["seccomp", "ptrace", "lista blanca", "runtime"]),
+    ("96", "Actions sin pin de SHA", "F", 3, ["DevSecOps"],
+     "Tags mutables, un tag secuestrado y un escáner ciego. Fija cada uses al commit correcto del mirror.",
+     ["GitHub Actions", "pin", "tag hijack", "supply chain"]),
+
+    # --- Pista G · AppSec web (vulnerable a propósito; red o blue) ----------
+    ("97", "Portal con SQLi en el login", "G", 2, ["AppSec", "Web"],
+     "El login concatena la SQL. Captura la flag por inyeccion (red) o pasa a consultas parametrizadas (blue).",
+     ["SQLi", "OWASP A03", "login bypass", "red/blue"]),
+    ("98", "Command injection en herramienta de red", "G", 2, ["AppSec", "Web"],
+     "Un parametro acaba en una shell. Ejecuta un comando (red) o quita shell=True y valida la entrada (blue).",
+     ["command injection", "OWASP A03", "shell", "red/blue"]),
+    ("99", "Gateway con SSRF", "G", 3, ["AppSec", "Web"],
+     "El fetcher pide cualquier URL y presta su cabecera de confianza. Alcanza el metadata interno (red) o pon allowlist host+puerto (blue).",
+     ["SSRF", "OWASP A10", "confused deputy", "red/blue"]),
+    ("100", "API con JWT alg:none", "G", 3, ["AppSec", "Auth"],
+     "El verificador obedece el 'alg' del token. Forja un admin (red) o fija HS256 y valida la firma (blue).",
+     ["JWT", "alg confusion", "OWASP A07", "red/blue"]),
+    ("101", "Importador XML con XXE", "G", 3, ["AppSec", "Web"],
+     "El parser resuelve entidades externas. Lee un fichero del servidor (red) o desactiva DTD/entidades (blue).",
+     ["XXE", "OWASP A05", "lxml", "red/blue"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
@@ -328,8 +383,11 @@ LAB_CURSOS = {
     # Pista E · anti-DDoS (curso 14)
     "79": ["14", "09"], "80": ["14"], "81": ["14"], "82": ["14", "13"],
     "83": ["14", "11"], "84": ["14", "11", "09"],
+    # Pista F · pipeline / runtime
+    "85": ["08"], "86": ["08"], "87": ["13"], "88": ["13"],
+    "91": ["13"], "92": ["13"], "93": ["13"], "94": ["13"], "96": ["13"],
 }
-ID_RE = re.compile(r"^\d{2}$")
+ID_RE = re.compile(r"^\d{2,3}$")
 
 
 def lab_dir(lab_id):
@@ -380,7 +438,7 @@ def container_running(lab_id):
     return code == 0 and "true" in out.lower()
 
 
-RUNNING_RE = re.compile(r"^tc-lab-(\d{2})$")
+RUNNING_RE = re.compile(r"^tc-lab-(\d{2,3})$")
 
 
 def lab_states():
@@ -652,14 +710,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "no disponible"}, 404)
             with open(cp, encoding="utf-8") as f:
                 return self._json({"markdown": f.read()})
-        m = re.match(r"^/api/labs/(\d{2})/(reto|solucion|guia)$", path)
+        m = re.match(r"^/api/labs/(\d{2,3})/(reto|solucion|guia)$", path)
         if m:
             lab_id, kind = m.group(1), m.group(2)
             txt = read_md(lab_id, kind)
             if txt is None:
                 return self._json({"error": "no disponible"}, 404)
             return self._json({"markdown": txt})
-        m = re.match(r"^/api/labs/(\d{2})/status$", path)
+        m = re.match(r"^/api/labs/(\d{2,3})/status$", path)
         if m:
             lab_id = m.group(1)
             if lab_id not in LAB_BY_ID:
@@ -676,7 +734,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         url = urlparse(self.path)
         path = url.path
-        m = re.match(r"^/api/labs/(\d{2})/(start|stop|reset|check|keep)$", path)
+        m = re.match(r"^/api/labs/(\d{2,3})/(start|stop|reset|check|keep)$", path)
         if not m:
             return self._json({"error": "ruta desconocida"}, 404)
         lab_id, action = m.group(1), m.group(2)

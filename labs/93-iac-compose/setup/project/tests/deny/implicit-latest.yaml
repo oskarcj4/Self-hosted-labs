@@ -1,0 +1,5 @@
+# Sin tag = :latest.
+services:
+  api:
+    image: shop/api
+    user: "10001:10001"

@@ -1,0 +1,5 @@
+# Tener user: no significa no ser root.
+services:
+  api:
+    image: shop/api:1.2.0
+    user: root

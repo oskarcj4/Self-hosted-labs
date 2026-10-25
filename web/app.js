@@ -2,7 +2,7 @@
 "use strict";
 
 const view = document.getElementById("view");
-const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)" };
+const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)" };
 let STATE = { labs: [], cursos: [], filter: "all", view: "home" };
 const POLL_MS = 8000; // refresco de "labs en ejecución"
 
@@ -375,7 +375,7 @@ function route() {
   let m;
   if (h === "#cursos") renderCourses();
   else if ((m = h.match(/^#curso\/(\d{2})$/))) renderCourse(m[1]);
-  else if ((m = h.match(/^#lab\/(\d{2})$/))) renderDetail(m[1]);
+  else if ((m = h.match(/^#lab\/(\d{2,3})$/))) renderDetail(m[1]);
   else renderHome();
 }
 
@@ -462,7 +462,7 @@ function renderHome() {
   setHash("");
   setNav("home");
   const labs = STATE.labs.filter((l) => STATE.filter === "all" || l.track === STATE.filter);
-  const byTrack = { A: [], B: [], C: [], D: [], E: [] };
+  const byTrack = { A: [], B: [], C: [], D: [], E: [], F: [], G: [] };
   labs.forEach((l) => byTrack[l.track].push(l));
   const trackHTML = (t) => (STATE.filter === "all" || STATE.filter === t)
     ? `<div class="section-label">${TRACKS[t]}</div>
@@ -480,6 +480,8 @@ function renderHome() {
     ${trackHTML("C")}
     ${trackHTML("D")}
     ${trackHTML("E")}
+    ${trackHTML("F")}
+    ${trackHTML("G")}
   `;
 
   bindRunningPanel(view.querySelector("#runningSlot"));
