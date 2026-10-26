@@ -373,6 +373,9 @@ LABS = [
     ("103", "Panel con fuga de artefacto de build", "H", 2, ["Red", "Web"],
      "Backup del código en el webroot y modo debug activo: captura user+root (red) o cierra las dos fugas sin romper el panel (blue).",
      ["info disclosure", "debug mode", "OWASP A05", "red/blue"]),
+    ("104", "Panel con credenciales por defecto y errores verbosos", "H", 2, ["Red", "Web"],
+     "Contraseña por defecto en el panel y trazas de error que filtran: captura user+root (red) o endurece credencial y calla los errores sin romper el panel (blue).",
+     ["default creds", "verbose errors", "OWASP A05", "OWASP A07", "red/blue"]),
 
     # --- Pista D (ampliación) · Operaciones de datos en producción ----------
     ("107", "Migración de datos en producción", "D", 3, ["Datos", "SRE"],
