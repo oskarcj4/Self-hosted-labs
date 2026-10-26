@@ -10,7 +10,7 @@
 
 # 💸 Adiós a las plataformas que te cobran una fortuna por aprender hacking
 
-### 101 laboratorios reales de DevSecOps, SRE, respuesta a incidentes y hardening.<br>En tu máquina. Gratis. Con un solo comando.
+### 102 laboratorios reales de DevSecOps, SRE, respuesta a incidentes y hardening.<br>En tu máquina. Gratis. Con un solo comando.
 
 ```bash
 python server.py
@@ -204,6 +204,17 @@ Las soluciones que se incluyen son **solo las del arreglo**.
 | 99 | Gateway con SSRF al metadata interno | A10 |
 | 100 | API con JWT `alg:none` | A07 |
 | 101 | Importador XML con XXE | A05 |
+
+### 🧩 Pista H — Máquinas HTB, red o blue (102+)
+
+Máquinas vulnerables con **caja atacante**, al estilo de Hack The Box. Al
+iniciar eliges en un popup: 🔴 **red** (sin shell en el target; atacas por la red
+y entregas las banderas user y root) o 🔵 **blue** (acceso total y un validador
+que comprueba el arreglo).
+
+| # | Lab | Clave |
+|---|---|---|
+| 102 | Saltar / blindar un firewall | iptables mal configurado (puerto de origen, orden de reglas) |
 
 ### 📚 Teoría de apoyo
 

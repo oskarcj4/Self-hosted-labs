@@ -177,3 +177,14 @@ arreglo** (blue), nunca el camino de explotación.
 | 99 | `99-web-ssrf-fetch` | Gateway con SSRF | fetcher confused-deputy a metadata interno · OWASP A10 |
 | 100 | `100-auth-jwt-weak` | API con JWT `alg:none` | confusión de algoritmo JWT · OWASP A07 |
 | 101 | `101-web-xxe-import` | Importador XML con XXE | entidad externa `lxml` lee fichero · OWASP A05 |
+
+# Pista H — Máquinas HTB (labs 102+)
+
+Máquinas vulnerables a propósito con **contenedor atacante**, estilo HTB. Al
+iniciar, un popup pregunta si juegas 🔴 red (sin acceso al target; atacas por la
+red desde una caja atacante y entregas las banderas **user** y **root**) o 🔵
+blue (acceso total + validador del arreglo). Mismo compose para ambos modos.
+
+| Lab | Carpeta | Tema | Clave |
+|-----|---------|------|-------|
+| 102 | `102-firewall-bypass` | Saltar / blindar un firewall | iptables: confianza en puerto de origen y orden de reglas |

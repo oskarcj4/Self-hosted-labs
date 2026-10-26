@@ -365,6 +365,11 @@ LABS = [
     ("101", "Importador XML con XXE", "G", 3, ["AppSec", "Web"],
      "El parser resuelve entidades externas. Lee un fichero del servidor (red) o desactiva DTD/entidades (blue).",
      ["XXE", "OWASP A05", "lxml", "red/blue"]),
+
+    # --- Pista H · Máquinas HTB (contenedor atacante; red o blue) -----------
+    ("102", "Saltar (o blindar) un firewall", "H", 3, ["Red", "Firewall"],
+     "Firewall mal configurado con dos servicios internos. Sáltalo y captura user+root (red) o cierra las vías de bypass (blue).",
+     ["iptables", "firewall bypass", "source port", "red/blue"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
@@ -408,13 +413,14 @@ def compose_file(lab_id):
     return f if os.path.isfile(f) else None
 
 
-def run(args, timeout=600):
+def run(args, timeout=600, env=None):
     """Ejecuta un comando (lista de args, sin shell) y devuelve (code, salida)."""
     try:
         # UTF-8 explícito: en Windows el locale por defecto (cp1252) no decodifica
         # la salida de check.sh (✓, emojis) ni el progreso de docker build.
         p = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=timeout)
+                           encoding="utf-8", errors="replace", timeout=timeout,
+                           env=({**os.environ, **env} if env else None))
         return p.returncode, (p.stdout + p.stderr)
     except subprocess.TimeoutExpired:
         return 124, "Tiempo agotado ejecutando el comando."
@@ -424,12 +430,54 @@ def run(args, timeout=600):
         return 1, f"Error: {e}"
 
 
-def dc(lab_id, *cmd, timeout=600):
+def dc(lab_id, *cmd, timeout=600, env=None):
     """docker compose -f <lab>/docker-compose.yml <cmd...>"""
     cf = compose_file(lab_id)
     if not cf:
         return 1, "Lab inexistente."
-    return run(["docker", "compose", "-f", cf, *cmd], timeout=timeout)
+    return run(["docker", "compose", "-f", cf, *cmd], timeout=timeout, env=env)
+
+
+# ---------------------------------------------------------------------------
+# Modo red / blue (labs estilo HTB con contenedor atacante)
+# ---------------------------------------------------------------------------
+# Un lab es "red-capaz" si su compose define el servicio 'attacker' tras el
+# profile 'red'. En blue se publica la terminal del target (ttyd) en el puerto
+# host; en red se publica la del contenedor atacante y el target queda sin
+# shell, solo accesible por la red Docker. Las banderas (user/root) las lee el
+# servidor del target con `docker exec -u 0` y las valida contra lo que envía
+# el alumno desde la web.
+_RED_CACHE = {}
+
+
+def red_capable(lab_id):
+    if lab_id in _RED_CACHE:
+        return _RED_CACHE[lab_id]
+    cf = compose_file(lab_id)
+    ok = False
+    if cf:
+        try:
+            with open(cf, encoding="utf-8") as f:
+                txt = f.read()
+            ok = "attacker:" in txt and "profiles:" in txt
+        except OSError:
+            ok = False
+    _RED_CACHE[lab_id] = ok
+    return ok
+
+
+def read_flags(lab_id):
+    """{'user': 'TCLAB{..}', 'root': 'TCLAB{..}'} leído del target (como root)."""
+    code, out = run(["docker", "exec", "-u", "0", f"tc-lab-{lab_id}",
+                     "cat", "/opt/lab/.flags"], timeout=20)
+    if code != 0:
+        return {}
+    flags = {}
+    for line in out.splitlines():
+        k, _, v = line.strip().partition("=")
+        if k and v:
+            flags[k.strip().lower()] = v.strip()
+    return flags
 
 
 def container_running(lab_id):
@@ -471,6 +519,8 @@ PENDING = {}   # id -> epoch en que se destruye (lab resuelto, en cuenta atrás)
 KEPT = set()   # ids que el usuario pidió mantener tras resolver
 BUSY = set()   # ids con start/reset/stop en curso: el reaper no los toca
 STARTED = {}   # id -> epoch de arranque del contenedor (para el TTL)
+MODE = {}      # id -> "red" | "blue" con el que se arrancó
+CAPTURED = {}  # id -> set() de banderas ya capturadas en red ("user"/"root")
 
 
 def log(msg):
@@ -645,6 +695,8 @@ def labs_payload():
             "exists": lab_dir(lab_id) is not None,
             "running": lab_id in running,
             "ttydPort": TTYD_BASE + int(lab_id),
+            "redCapable": red_capable(lab_id),
+            "mode": MODE.get(lab_id),
         })
     return out
 
@@ -722,11 +774,21 @@ class Handler(BaseHTTPRequestHandler):
             lab_id = m.group(1)
             if lab_id not in LAB_BY_ID:
                 return self._json({"error": "lab inexistente"}, 404)
-            return self._json({
+            mode = MODE.get(lab_id)
+            payload = {
                 "running": container_running(lab_id),
                 "ttydPort": TTYD_BASE + int(lab_id),
+                "mode": mode,
+                "redCapable": red_capable(lab_id),
                 **lifecycle(lab_id),
-            })
+            }
+            if mode == "red" and payload["running"]:
+                flags = read_flags(lab_id)
+                with LOCK:
+                    cap = sorted(CAPTURED.get(lab_id, set()))
+                payload["flagKinds"] = sorted(flags)   # solo los nombres
+                payload["captured"] = cap
+            return self._json(payload)
         if path.startswith("/api/"):
             return self._json({"error": "ruta desconocida"}, 404)
         return self._file(path)
@@ -734,12 +796,56 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         url = urlparse(self.path)
         path = url.path
-        m = re.match(r"^/api/labs/(\d{2,3})/(start|stop|reset|check|keep)$", path)
+        m = re.match(r"^/api/labs/(\d{2,3})/(start|stop|reset|check|keep|flag)$",
+                     path)
         if not m:
             return self._json({"error": "ruta desconocida"}, 404)
         lab_id, action = m.group(1), m.group(2)
         if lab_dir(lab_id) is None:
             return self._json({"error": "lab inexistente"}, 404)
+
+        qs = url.query.split("&")
+        want_red = "mode=red" in qs and red_capable(lab_id)
+
+        # Envío de bandera (solo modo red): comparar contra lo que el target
+        # guarda en /opt/lab/.flags, que solo lee el servidor (docker exec -u 0).
+        if action == "flag":
+            if MODE.get(lab_id) != "red":
+                return self._json(
+                    {"ok": False, "error": "Las banderas solo se envían en red."},
+                    400)
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                body = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                body = {}
+            kind = str(body.get("kind", "")).lower()
+            value = str(body.get("value", "")).strip()
+            flags = read_flags(lab_id)
+            if not flags:
+                return self._json(
+                    {"ok": False,
+                     "error": "No pude leer las banderas (¿target corriendo?)."},
+                    409)
+            if kind not in flags:
+                return self._json(
+                    {"ok": False, "error": "Bandera desconocida: %s" % kind}, 400)
+            correct = bool(value) and value == flags[kind]
+            with LOCK:
+                cap = CAPTURED.setdefault(lab_id, set())
+                if correct:
+                    cap.add(kind)
+                captured = sorted(cap)
+                remaining = sorted(set(flags) - cap)
+            solved = correct and not remaining
+            if solved:
+                schedule_destroy(lab_id)
+            return self._json({
+                "ok": correct, "kind": kind, "correct": correct,
+                "captured": captured, "remaining": remaining,
+                "required": sorted(flags), "solved": solved,
+                **lifecycle(lab_id),
+            })
 
         # Levantar un lab con otros de la página ya corriendo consume RAM/CPU
         # de más: se rechaza con 409 salvo que el cliente confirme con ?force=1.
@@ -770,16 +876,41 @@ class Handler(BaseHTTPRequestHandler):
                 PENDING.pop(lab_id, None)
                 KEPT.discard(lab_id)
                 STARTED.pop(lab_id, None)
+                CAPTURED.pop(lab_id, None)
+            port = TTYD_BASE + int(lab_id)
+
+            def _up(force=()):
+                if want_red:
+                    env = {"TCLAB_MODE": "red", "ATTACKER_PUB": str(port),
+                           "TARGET_PUB": "0"}
+                    return dc(lab_id, "--profile", "red", "up", "-d",
+                              "--build", *force, env=env)
+                env = {"TCLAB_MODE": "blue", "TARGET_PUB": str(port),
+                       "ATTACKER_PUB": "0"}
+                return dc(lab_id, "up", "-d", "--build", *force, env=env)
+
+            def _down():
+                args = ["down", "-v", "--remove-orphans", "-t", "5"]
+                if red_capable(lab_id):
+                    args = ["--profile", "red", *args]
+                return dc(lab_id, *args)
+
             try:
                 if action == "start":
-                    code, out = dc(lab_id, "up", "-d", "--build")
+                    code, out = _up()
+                    if code == 0:
+                        with LOCK:
+                            MODE[lab_id] = "red" if want_red else "blue"
                 elif action == "stop":
-                    code, out = dc(lab_id, "down", "-v", "--remove-orphans",
-                                   "-t", "5")
+                    code, out = _down()
+                    with LOCK:
+                        MODE.pop(lab_id, None)
                 else:  # reset
-                    dc(lab_id, "down", "-v", "--remove-orphans", "-t", "5")
-                    code, out = dc(lab_id, "up", "-d", "--build",
-                                   "--force-recreate")
+                    _down()
+                    code, out = _up(force=("--force-recreate",))
+                    if code == 0:
+                        with LOCK:
+                            MODE[lab_id] = "red" if want_red else "blue"
             finally:
                 with LOCK:
                     BUSY.discard(lab_id)
@@ -789,6 +920,8 @@ class Handler(BaseHTTPRequestHandler):
             "code": code,
             "output": out[-20000:],  # recorta salidas enormes
             "running": container_running(lab_id),
+            "mode": MODE.get(lab_id),
+            "redCapable": red_capable(lab_id),
             **lifecycle(lab_id),
         })
 
