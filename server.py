@@ -379,6 +379,9 @@ LABS = [
     ("105", "Proxy de estado vulnerable a SSRF", "H", 3, ["Red", "Web"],
      "Un /fetch sin restringir deja apuntar al metadata interno (127.0.0.1:8081): captura user+root (red) o cierra el SSRF con allowlist sin romper el health (blue).",
      ["SSRF", "allowlist", "OWASP A10", "metadata", "red/blue"]),
+    ("106", "Visor de documentos: path traversal + bypass de autorización", "H", 3, ["Red", "Web"],
+     "Descarga sin saneo de ruta y /admin que se fía de la cabecera X-Admin: captura user+root (red) o cierra ambas sin romper la descarga legítima (blue).",
+     ["path traversal", "broken access control", "OWASP A01", "red/blue"]),
 
     # --- Pista D (ampliación) · Operaciones de datos en producción ----------
     ("107", "Migración de datos en producción", "D", 3, ["Datos", "SRE"],
