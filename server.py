@@ -370,6 +370,9 @@ LABS = [
     ("102", "Saltar (o blindar) un firewall", "H", 3, ["Red", "Firewall"],
      "Firewall mal configurado con dos servicios internos. Sáltalo y captura user+root (red) o cierra las vías de bypass (blue).",
      ["iptables", "firewall bypass", "source port", "red/blue"]),
+    ("103", "Panel con fuga de artefacto de build", "H", 2, ["Red", "Web"],
+     "Backup del código en el webroot y modo debug activo: captura user+root (red) o cierra las dos fugas sin romper el panel (blue).",
+     ["info disclosure", "debug mode", "OWASP A05", "red/blue"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
