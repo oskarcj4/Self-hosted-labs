@@ -373,6 +373,11 @@ LABS = [
     ("103", "Panel con fuga de artefacto de build", "H", 2, ["Red", "Web"],
      "Backup del código en el webroot y modo debug activo: captura user+root (red) o cierra las dos fugas sin romper el panel (blue).",
      ["info disclosure", "debug mode", "OWASP A05", "red/blue"]),
+
+    # --- Pista D (ampliación) · Operaciones de datos en producción ----------
+    ("107", "Migración de datos en producción", "D", 3, ["Datos", "SRE"],
+     "Migra una columna de una tabla grande con usuarios comprando (tráfico k6). Hazlo online (expand/contract) sin tumbar la tienda con un lock.",
+     ["postgres", "zero-downtime", "locks", "expand/contract", "k6"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 

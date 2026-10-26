@@ -1,0 +1,14 @@
+[Unit]
+Description=API de la tienda (lab 107)
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+# No depende de labsetup: si la BD aún no está, la API responde 503 y Restart
+# la mantiene viva hasta que el escenario queda plantado.
+ExecStart=/usr/bin/python3 /opt/app/app.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
