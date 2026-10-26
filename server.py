@@ -376,6 +376,9 @@ LABS = [
     ("104", "Panel con credenciales por defecto y errores verbosos", "H", 2, ["Red", "Web"],
      "Contraseña por defecto en el panel y trazas de error que filtran: captura user+root (red) o endurece credencial y calla los errores sin romper el panel (blue).",
      ["default creds", "verbose errors", "OWASP A05", "OWASP A07", "red/blue"]),
+    ("105", "Proxy de estado vulnerable a SSRF", "H", 3, ["Red", "Web"],
+     "Un /fetch sin restringir deja apuntar al metadata interno (127.0.0.1:8081): captura user+root (red) o cierra el SSRF con allowlist sin romper el health (blue).",
+     ["SSRF", "allowlist", "OWASP A10", "metadata", "red/blue"]),
 
     # --- Pista D (ampliación) · Operaciones de datos en producción ----------
     ("107", "Migración de datos en producción", "D", 3, ["Datos", "SRE"],
