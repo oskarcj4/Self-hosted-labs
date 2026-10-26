@@ -378,6 +378,9 @@ LABS = [
     ("107", "Migración de datos en producción", "D", 3, ["Datos", "SRE"],
      "Migra una columna de una tabla grande con usuarios comprando (tráfico k6). Hazlo online (expand/contract) sin tumbar la tienda con un lock.",
      ["postgres", "zero-downtime", "locks", "expand/contract", "k6"]),
+    ("108", "Restaurar un backup y reconectar la app", "D", 2, ["Datos", "SRE"],
+     "Se perdió la base de producción. Elige el backup bueno, restáuralo y reconecta la app (DSN + reinicio) hasta que /health vuelva a 200.",
+     ["postgres", "backup", "pg_restore", "DSN", "incidente"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
