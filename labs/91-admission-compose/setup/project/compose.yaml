@@ -1,0 +1,12 @@
+name: shipyard
+
+services:
+  api:
+    image: shop/api:1.0
+    build: ./api
+    privileged: true
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped

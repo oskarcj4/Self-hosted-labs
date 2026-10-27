@@ -1,0 +1,16 @@
+name: ci
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+      - name: lint
+        uses: acme/lint@v2
+      - uses: acme/tool@v1
+      - uses: ./.github/actions/local-setup
+      - run: python -m pytest
+  release:
+    needs: test
+    uses: acme/workflows/.github/workflows/release.yml@main

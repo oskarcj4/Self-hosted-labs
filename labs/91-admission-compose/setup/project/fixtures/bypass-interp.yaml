@@ -1,0 +1,6 @@
+# Red team #1: el texto no dice "privileged: true". El contenedor sí lo es.
+name: rt1
+services:
+  x:
+    image: python:3.12-alpine
+    privileged: ${PRIV:-true}

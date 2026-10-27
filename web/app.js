@@ -2,7 +2,7 @@
 "use strict";
 
 const view = document.getElementById("view");
-const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)" };
+const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)", H: "Máquinas HTB (red / blue)" };
 let STATE = { labs: [], cursos: [], filter: "all", view: "home" };
 const POLL_MS = 8000; // refresco de "labs en ejecución"
 
@@ -10,8 +10,13 @@ const POLL_MS = 8000; // refresco de "labs en ejecución"
 const esc = (s) => s.replace(/[&<>"']/g, (c) => (
   { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-async function api(path, method = "GET") {
-  const r = await fetch(path, { method });
+async function api(path, method = "GET", body) {
+  const opt = { method };
+  if (body !== undefined) {
+    opt.headers = { "Content-Type": "application/json" };
+    opt.body = JSON.stringify(body);
+  }
+  const r = await fetch(path, opt);
   if (!r.ok && r.status >= 500) throw new Error("backend " + r.status);
   return r.json();
 }
@@ -345,8 +350,8 @@ function askConflict(l, ids) {
 }
 
 /* start/reset con aviso: si el backend responde conflicto, pregunta al usuario. */
-async function guardedAction(l, action) {
-  let r = await api(`/api/labs/${l.id}/${action}`, "POST");
+async function guardedAction(l, action, extra = "") {
+  let r = await api(`/api/labs/${l.id}/${action}${extra}`, "POST");
   if (!r.conflict) return r;
   const choice = await askConflict(l, r.running);
   if (!choice) return null;
@@ -356,7 +361,49 @@ async function guardedAction(l, action) {
     }
     await refreshRunning();
   }
-  return api(`/api/labs/${l.id}/${action}?force=1`, "POST");
+  const q = extra ? `${extra}&force=1` : "?force=1";
+  return api(`/api/labs/${l.id}/${action}${q}`, "POST");
+}
+
+/* Popup red/blue para labs con contenedor atacante (estilo HTB). */
+function askMode(l) {
+  let dlg = document.getElementById("modeDialog");
+  if (!dlg) {
+    dlg = document.createElement("dialog");
+    dlg.id = "modeDialog";
+    dlg.className = "dialog";
+    document.body.appendChild(dlg);
+  }
+  dlg.innerHTML = `<form method="dialog">
+    <h2 class="dialog__title">¿Cómo quieres jugar LAB ${l.id}?</h2>
+    <p class="dialog__text">Este lab se puede resolver de dos formas.</p>
+    <div class="modepick">
+      <button class="modecard modecard--red" value="red" autofocus>
+        <span class="modecard__tag">🔴 RED · atacar</span>
+        <span class="modecard__t">Capturar las banderas</span>
+        <span class="modecard__d">Sin acceso al servidor. Trabajas desde una caja
+        atacante y llegas al target por la red. Entregas las banderas
+        <strong>user</strong> y <strong>root</strong>.</span>
+      </button>
+      <button class="modecard modecard--blue" value="blue">
+        <span class="modecard__tag">🔵 BLUE · defender</span>
+        <span class="modecard__t">Arreglar la vulnerabilidad</span>
+        <span class="modecard__d">Acceso total al target (shell). Cierras el fallo y
+        un validador comprueba que ya no se puede explotar.</span>
+      </button>
+    </div>
+    <div class="dialog__actions">
+      <button class="btn" value="cancel">Cancelar</button>
+    </div>
+  </form>`;
+  return new Promise((resolve) => {
+    dlg.addEventListener("close", () => {
+      const v = dlg.returnValue;
+      resolve(v === "red" || v === "blue" ? v : null);
+    }, { once: true });
+    dlg.returnValue = "";
+    dlg.showModal();
+  });
 }
 
 /* ---------- cursos ---------- */
@@ -375,7 +422,7 @@ function route() {
   let m;
   if (h === "#cursos") renderCourses();
   else if ((m = h.match(/^#curso\/(\d{2})$/))) renderCourse(m[1]);
-  else if ((m = h.match(/^#lab\/(\d{2})$/))) renderDetail(m[1]);
+  else if ((m = h.match(/^#lab\/(\d{2,3})$/))) renderDetail(m[1]);
   else renderHome();
 }
 
@@ -462,7 +509,7 @@ function renderHome() {
   setHash("");
   setNav("home");
   const labs = STATE.labs.filter((l) => STATE.filter === "all" || l.track === STATE.filter);
-  const byTrack = { A: [], B: [], C: [], D: [], E: [] };
+  const byTrack = { A: [], B: [], C: [], D: [], E: [], F: [], G: [], H: [] };
   labs.forEach((l) => byTrack[l.track].push(l));
   const trackHTML = (t) => (STATE.filter === "all" || STATE.filter === t)
     ? `<div class="section-label">${TRACKS[t]}</div>
@@ -480,6 +527,9 @@ function renderHome() {
     ${trackHTML("C")}
     ${trackHTML("D")}
     ${trackHTML("E")}
+    ${trackHTML("F")}
+    ${trackHTML("G")}
+    ${trackHTML("H")}
   `;
 
   bindRunningPanel(view.querySelector("#runningSlot"));
@@ -506,7 +556,7 @@ async function renderDetail(id) {
         <div class="card__id">LAB ${l.id} · ${TRACKS[l.track]}</div>
         <h1 class="detail__title">${esc(l.name)}</h1>
         ${l.description ? `<p class="detail__desc">${esc(l.description)}</p>` : ""}
-        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)} <span id="statusText">comprobando…</span></div>
+        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)} <span id="modeBadge"></span> <span id="statusText">comprobando…</span></div>
       </div>
     </div>
     ${helpHTML(l)}
@@ -580,13 +630,20 @@ async function renderDetail(id) {
     btn.disabled = busy;
     btn.innerHTML = busy ? `<span class="spinner"></span> ${label}` : btn.dataset.label;
   };
-  const bind = (sel, label, action, after) => {
+  const bind = (sel, label, action, after, pre) => {
     const b = view.querySelector(sel); b.dataset.label = b.innerHTML;
     b.addEventListener("click", async () => {
+      let extra = "";
+      if (pre) {
+        const v = await pre();
+        if (v === null) { toast("Cancelado"); return; }
+        if (v === false) return;   // manejado por el propio pre (sin toast)
+        extra = v;
+      }
       setBusy(b, true, label);
       try {
         const r = (action === "start" || action === "reset")
-          ? await guardedAction(l, action)
+          ? await guardedAction(l, action, extra)
           : await api(`/api/labs/${id}/${action}`, "POST");
         if (r) after(r); else toast("Cancelado");
       } catch (e) { toast("Error: " + e.message); }
@@ -596,20 +653,39 @@ async function renderDetail(id) {
     });
   };
 
+  // Elección de modo (solo labs red-capaces). Se recuerda para reiniciar.
+  const preStart = async () => {
+    if (!l.redCapable) return "";
+    const m = await askMode(l);
+    if (!m) return null;
+    l.chosenMode = m;
+    return m === "red" ? "?mode=red" : "";
+  };
+  const preReset = async () =>
+    (l.redCapable && l.chosenMode === "red") ? "?mode=red" : "";
+
   bind("#btnStart", "Iniciando…", "start", (r) => {
     toast(r.ok ? "Lab iniciado" : "Fallo al iniciar");
-    if (r.ok) { switchTab("term"); mountTerminal(l); }
+    if (r.ok) { l.mode = r.mode; applyMode(l); switchTab("term"); mountTerminal(l); }
     else showCheck(r.output, false);
-  });
-  bind("#btnReset", "Reiniciando…", "reset", (r) => { toast(r.ok ? "Escenario re-plantado" : "Fallo al reiniciar"); });
-  bind("#btnStop", "Deteniendo…", "stop", (r) => { toast("Lab detenido y destruido"); closePopout(l.id); l.running = false; l.destroyIn = null; clearTerminal(l); });
+  }, preStart);
+  bind("#btnReset", "Reiniciando…", "reset", (r) => {
+    if (r.ok) { l.mode = r.mode; applyMode(l); }
+    toast(r.ok ? "Escenario re-plantado" : "Fallo al reiniciar");
+  }, preReset);
+  bind("#btnStop", "Deteniendo…", "stop", (r) => { toast("Lab detenido y destruido"); closePopout(l.id); l.running = false; l.mode = null; applyMode(l); l.destroyIn = null; clearTerminal(l); });
+  const preCheck = async () => {
+    // En red no se ejecuta check.sh: se entregan banderas en el panel de captura.
+    if (l.mode === "red") { switchTab("check"); renderCapture(l); return false; }
+    return "";
+  };
   bind("#btnCheck", "Validando…", "check", (r) => {
     // Desde la terminal no se cambia de pestaña: el resultado sale encima del enunciado.
     if (!termVisible()) switchTab("check");
     showCheck(r.output || "(sin salida)", r.ok);
     toast(r.ok ? "¡Resuelto! 🎉" : "Aún faltan objetivos");
     if (r.ok) { l.destroyIn = r.destroyIn; renderLifeBanner(); updateRunningUI(true); }
-  });
+  }, preCheck);
 
   renderOthersBanner();
   renderLifeBanner();
@@ -644,15 +720,87 @@ async function refreshStatus(l) {
     l.running = s.running;
     l.destroyIn = s.running ? s.destroyIn : null;
     l.expiresIn = s.running ? s.expiresIn : null;
+    if (s.redCapable != null) l.redCapable = s.redCapable;
+    l.mode = s.running ? s.mode : null;
     const st = view.querySelector("#statusText");
     if (st) st.innerHTML = s.running
       ? '<span class="badge live"><span class="dot"></span>activo</span>'
         + (l.expiresIn != null ? ` <span class="muted">· autodestrucción como máximo en <span data-countdown-ttl="${l.id}">${fmtSecs(l.expiresIn)}</span></span>` : "")
       : '<span class="badge"><span class="dot"></span>detenido</span>';
+    applyMode(l);
     renderLifeBanner();
     const term = view.querySelector(".panel[data-panel='term']");
     if (term && term.classList.contains("active")) mountTerminal(l);
   } catch (_) {}
+}
+
+/* Ajusta la vista al modo activo (red = captura de banderas; blue = validar). */
+function applyMode(l) {
+  const red = l.mode === "red";
+  const mb = view.querySelector("#modeBadge");
+  if (mb) mb.innerHTML = l.mode
+    ? `<span class="mbadge mbadge--${l.mode}">${red ? "🔴 RED" : "🔵 BLUE"}</span>` : "";
+  const checkTab = view.querySelector('.tab[data-panel="check"]');
+  if (checkTab) checkTab.textContent = red ? "Capturar" : "Validación";
+  const solTab = view.querySelector('.tab[data-panel="sol"]');
+  if (solTab) solTab.style.display = red ? "none" : "";  // red no muestra el fix
+  const bc = view.querySelector("#btnCheck");
+  if (bc) {
+    const t = red ? "⚑ Entregar banderas" : "✓ Validar";
+    bc.dataset.label = t;
+    if (!bc.disabled) bc.innerHTML = t;
+  }
+  const cap = view.querySelector("#capture");
+  if (red && l.running) renderCapture(l);
+  else if (cap) cap.remove();
+}
+
+/* Panel de entrega de banderas (modo red). */
+async function renderCapture(l) {
+  const panel = view.querySelector('.panel[data-panel="check"]');
+  if (!panel) return;
+  let s;
+  try { s = await api(`/api/labs/${l.id}/status`); } catch (_) { return; }
+  if (s.mode !== "red") return;
+  const kinds = (s.flagKinds && s.flagKinds.length) ? s.flagKinds : ["user", "root"];
+  const done = new Set(s.captured || []);
+  const rows = kinds.map((k) => `
+    <div class="cap-row" data-row="${k}">
+      <span class="cap-k">${esc(k)}</span>
+      <input class="cap-in" data-flag="${k}" placeholder="TCLAB{…}"
+             ${done.has(k) ? 'disabled value="✓ capturada"' : ""}>
+      <button class="btn btn--sm" data-cap="${k}" ${done.has(k) ? "disabled" : ""}>Entregar</button>
+      <span class="cap-st" data-capst="${k}">${done.has(k) ? "✓ capturada" : ""}</span>
+    </div>`).join("");
+  const empty = panel.querySelector("#checkEmpty"); if (empty) empty.style.display = "none";
+  const out = panel.querySelector("#checkOut"); if (out) out.style.display = "none";
+  let box = panel.querySelector("#capture");
+  if (!box) { box = document.createElement("div"); box.id = "capture"; panel.prepend(box); }
+  box.innerHTML = `
+    <div class="cap-head">
+      <strong>Entrega de banderas</strong>
+      <p class="muted">Target: <code>target</code>. Desde la <strong>caja atacante</strong>
+      (pestaña Terminal) resuélvelo con <code>getent hosts target</code> y alcánzalo por la red.</p>
+    </div>${rows}`;
+  box.querySelectorAll("[data-cap]").forEach((btn) => btn.addEventListener("click", async () => {
+    const k = btn.dataset.cap;
+    const inp = box.querySelector(`[data-flag="${k}"]`);
+    const stt = box.querySelector(`[data-capst="${k}"]`);
+    const val = (inp.value || "").trim();
+    if (!val) { stt.textContent = "pega la bandera"; return; }
+    btn.disabled = true;
+    try {
+      const r = await api(`/api/labs/${l.id}/flag`, "POST", { kind: k, value: val });
+      if (r.correct) {
+        stt.textContent = "✓ capturada"; inp.disabled = true; inp.value = "✓ capturada";
+        toast(`Bandera ${k} correcta`);
+        if (r.solved) { l.destroyIn = r.destroyIn; renderLifeBanner(); updateRunningUI(true); toast("¡Todas las banderas! 🎉"); }
+      } else {
+        stt.textContent = "✗ incorrecta"; btn.disabled = false;
+        toast(r.error || "Bandera incorrecta");
+      }
+    } catch (e) { stt.textContent = "error"; btn.disabled = false; }
+  }));
 }
 
 /* ---------- terminal ---------- */

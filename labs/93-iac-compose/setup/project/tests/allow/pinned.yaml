@@ -1,0 +1,5 @@
+# Correcto. Ojo: el comentario dice privileged: true y :latest, y no son hallazgos.
+services:
+  api:
+    image: localhost:5000/shop/api:1.2.0
+    user: "10001:10001"

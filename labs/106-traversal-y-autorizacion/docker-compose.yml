@@ -1,0 +1,37 @@
+# blue: solo 'lab' (target) con ttyd -> acceso total.
+# red : profile 'red' levanta 'attacker' + 'lab' sin terminal (solo red interna).
+name: tclab-106
+
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-106
+    hostname: target
+    environment:
+      - TCLAB_MODE=${TCLAB_MODE:-blue}
+    networks:
+      labnet:
+        aliases: [target, gateway.lab]
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:${TARGET_PUB:-7706}:7681"
+
+  attacker:
+    profiles: [red]
+    build:
+      context: .
+      dockerfile: Dockerfile.attacker
+    container_name: tc-lab-106-attacker
+    depends_on: [lab]
+    networks:
+      labnet:
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:${ATTACKER_PUB:-7706}:7681"
+
+networks:
+  labnet:
+    driver: bridge

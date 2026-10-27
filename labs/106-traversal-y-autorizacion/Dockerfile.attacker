@@ -1,0 +1,14 @@
+# Caja atacante (modo red). Herramientas de red, SIN acceso al target ni a las
+# banderas: hay que alcanzarlas por HTTP.
+FROM debian:12-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl nmap ncat netcat-openbsd python3 iproute2 iputils-ping \
+      dnsutils jq grep less vim-tiny ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64 \
+      -o /usr/local/bin/ttyd && chmod +x /usr/local/bin/ttyd
+COPY setup/attacker-motd.sh /etc/profile.d/zz-motd.sh
+RUN chmod 0644 /etc/profile.d/zz-motd.sh
+WORKDIR /root
+CMD exec ttyd -p 7681 -W -t fontSize=14 bash -l

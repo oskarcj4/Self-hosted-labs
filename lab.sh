@@ -99,7 +99,7 @@ case "$cmd" in
     ;;
   reap)
     docker ps -a --filter name=tc-lab- --format '{{.Names}} {{.State}}' | while read -r name state; do
-      [[ "$name" =~ ^tc-lab-([0-9]{2})$ ]] || continue
+      [[ "$name" =~ ^tc-lab-([0-9]{2,3})$ ]] || continue
       d="$(lab_dir "${BASH_REMATCH[1]}")"
       if [ "$state" != running ] || solved "$d"; then destroy "$d"; fi
     done

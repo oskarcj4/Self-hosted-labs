@@ -1,0 +1,10 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-95
+    hostname: seccomp-host
+    privileged: true
+    init: true
+    ports:
+      - "127.0.0.1:7695:7681"

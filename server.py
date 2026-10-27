@@ -51,7 +51,8 @@ REAP_EVERY_S = 10
 
 # Registro de labs. Única fuente de verdad de metadatos; el contenido (RETO.md,
 # SOLUCION.md) se lee del disco. 'track': A = detección/respuesta, B = hardening,
-# C = 30 días de DevSecOps, D = operaciones/SRE, E = defensa anti-DDoS/DoS.
+# C = 30 días de DevSecOps, D = operaciones/SRE, E = defensa anti-DDoS/DoS,
+# F = pipeline CI y runtime Docker.
 # 'cats': categorías visibles en la tarjeta (DevSecOps,
 # DevOps, SysAdmin, Redes, Forense, Pentest, Docker). 'desc': resumen de una línea para la tarjeta.
 LABS = [
@@ -310,6 +311,91 @@ LABS = [
     ("84", "Respuesta a incidentes tras un DDoS", "E", 2, ["DevSecOps", "SysAdmin", "Forense"],
      "El flood amainó. Cierra el incidente: mitigación duradera en el firewall y postmortem.",
      ["iptables hashlimit", "blocklist", "postmortem"]),
+    # --- Pista F · Pipeline CI y runtime Docker -----------------------------
+    ("85", "Parche rolling sin downtime", "F", 3, ["DevSecOps", "SRE"],
+     "Hay que subir shop 1.0.0 → 1.2.0 detrás del balanceador sin cortar HTTP ni reiniciar nginx.",
+     ["rolling", "reload", "health", "dos backends"]),
+    ("86", "Cutover blue-green", "F", 3, ["DevSecOps", "SRE"],
+     "Green sigue en 1.0.0 vulnerable. Blue ya está parcheado: cambia el upstream y recarga en caliente.",
+     ["blue-green", "upstream", "nginx reload", "rollback"]),
+    ("87", "Pipeline CI que filtra secretos", "F", 3, ["DevSecOps", "Docker"],
+     "El runner imprime el token, monta docker.sock y corre en pull_request. Endurécelo sin romper el build.",
+     ["CI", "secretos", "docker.sock", "pull_request"]),
+    ("88", "Gate de seguridad saltado", "F", 3, ["DevSecOps"],
+     "El job de scan está en continue-on-error y el deploy no lo espera. El gate tiene que ser obligatorio y verde.",
+     ["pipeline", "needs", "continue-on-error", "scan"]),
+    ("89", "Capabilities y no-new-privileges", "F", 2, ["Docker", "DevSecOps"],
+     "La API arranca con CAP_ALL y SYS_ADMIN. Déjala en cap_drop ALL y no-new-privileges, sirviendo igual.",
+     ["cap_drop", "no-new-privileges", "least privilege"]),
+    ("90", "Cerrar vías de escape al host", "F", 3, ["Docker", "DevSecOps"],
+     "privileged, pid/net host, docker.sock y / del host. Quita las vías de escape y deja la API con su volumen de datos.",
+     ["privileged", "docker.sock", "pid: host", "bind /"]),
+    ("91", "Admission: política de Compose", "F", 3, ["DevSecOps", "Docker"],
+     "El admitidor es un grep y red team tiene 12 bypasses. Evalúa el compose renderizado, fail-closed, y engánchalo al deploy.",
+     ["admission", "policy as code", "compose config", "fail-closed"]),
+    ("92", "SBOM firmado y verificado", "F", 3, ["DevSecOps", "Docker"],
+     "El gate de release está en verde con una clave que trajo el atacante. Ancla de confianza, SBOM real y atado a la imagen.",
+     ["SBOM", "firma", "ancla de confianza", "supply chain"]),
+    ("93", "Scan IaC del Compose", "F", 3, ["DevSecOps", "Docker"],
+     "Un PR puso el scan en verde esquivando el grep. Arregla el escáner contra un corpus de casos y luego el compose.",
+     ["IaC", "scanner", "falsos negativos", "tests"]),
+    ("94", "xtrace que filtra el secreto", "F", 3, ["DevSecOps"],
+     "El token sale por xtrace escondido, base64 y artefactos. Ciérralas y enmascara secretos en el runner.",
+     ["set -x", "masking", "artefactos", "CI"]),
+    ("95", "seccomp: perfil propio", "F", 3, ["Docker", "DevSecOps"],
+     "La api corre unconfined. Deriva del perfil de Docker uno que niegue ptrace y process_vm_* y pruébalo en runtime.",
+     ["seccomp", "ptrace", "lista blanca", "runtime"]),
+    ("96", "Actions sin pin de SHA", "F", 3, ["DevSecOps"],
+     "Tags mutables, un tag secuestrado y un escáner ciego. Fija cada uses al commit correcto del mirror.",
+     ["GitHub Actions", "pin", "tag hijack", "supply chain"]),
+
+    # --- Pista G · AppSec web (vulnerable a propósito; red o blue) ----------
+    ("97", "Portal con SQLi en el login", "G", 2, ["AppSec", "Web"],
+     "El login concatena la SQL. Captura la flag por inyeccion (red) o pasa a consultas parametrizadas (blue).",
+     ["SQLi", "OWASP A03", "login bypass", "red/blue"]),
+    ("98", "Command injection en herramienta de red", "G", 2, ["AppSec", "Web"],
+     "Un parametro acaba en una shell. Ejecuta un comando (red) o quita shell=True y valida la entrada (blue).",
+     ["command injection", "OWASP A03", "shell", "red/blue"]),
+    ("99", "Gateway con SSRF", "G", 3, ["AppSec", "Web"],
+     "El fetcher pide cualquier URL y presta su cabecera de confianza. Alcanza el metadata interno (red) o pon allowlist host+puerto (blue).",
+     ["SSRF", "OWASP A10", "confused deputy", "red/blue"]),
+    ("100", "API con JWT alg:none", "G", 3, ["AppSec", "Auth"],
+     "El verificador obedece el 'alg' del token. Forja un admin (red) o fija HS256 y valida la firma (blue).",
+     ["JWT", "alg confusion", "OWASP A07", "red/blue"]),
+    ("101", "Importador XML con XXE", "G", 3, ["AppSec", "Web"],
+     "El parser resuelve entidades externas. Lee un fichero del servidor (red) o desactiva DTD/entidades (blue).",
+     ["XXE", "OWASP A05", "lxml", "red/blue"]),
+
+    # --- Pista H · Máquinas HTB (contenedor atacante; red o blue) -----------
+    ("102", "Saltar (o blindar) un firewall", "H", 3, ["Red", "Firewall"],
+     "Firewall mal configurado con dos servicios internos. Sáltalo y captura user+root (red) o cierra las vías de bypass (blue).",
+     ["iptables", "firewall bypass", "source port", "red/blue"]),
+    ("103", "Panel con fuga de artefacto de build", "H", 2, ["Red", "Web"],
+     "Backup del código en el webroot y modo debug activo: captura user+root (red) o cierra las dos fugas sin romper el panel (blue).",
+     ["info disclosure", "debug mode", "OWASP A05", "red/blue"]),
+    ("104", "Panel con credenciales por defecto y errores verbosos", "H", 2, ["Red", "Web"],
+     "Contraseña por defecto en el panel y trazas de error que filtran: captura user+root (red) o endurece credencial y calla los errores sin romper el panel (blue).",
+     ["default creds", "verbose errors", "OWASP A05", "OWASP A07", "red/blue"]),
+    ("105", "Proxy de estado vulnerable a SSRF", "H", 3, ["Red", "Web"],
+     "Un /fetch sin restringir deja apuntar al metadata interno (127.0.0.1:8081): captura user+root (red) o cierra el SSRF con allowlist sin romper el health (blue).",
+     ["SSRF", "allowlist", "OWASP A10", "metadata", "red/blue"]),
+    ("106", "Visor de documentos: path traversal + bypass de autorización", "H", 3, ["Red", "Web"],
+     "Descarga sin saneo de ruta y /admin que se fía de la cabecera X-Admin: captura user+root (red) o cierra ambas sin romper la descarga legítima (blue).",
+     ["path traversal", "broken access control", "OWASP A01", "red/blue"]),
+    ("109", "Saltar (o blindar) un firewall hasta el SSH interno", "H", 3, ["Red", "Firewall"],
+     "Firewall en lista negra con una regla de SSH mal escrita: llega al 22 interno y pivota a la consola admin para capturar user+root (red) o pásalo a lista blanca (blue).",
+     ["iptables", "firewall bypass", "default policy", "ssh", "red/blue"]),
+    ("110", "Cruzar (o parchear) un firewall por un panel sin actualizar", "H", 3, ["Red", "Firewall"],
+     "Firewall correcto, pero el panel Webmin 1.920 expuesto es vulnerable a CVE-2019-15107 (RCE real): cruza el perímetro y captura user+root (red) o actualiza el panel y cierra el CVE sin tocar el firewall (blue).",
+     ["Webmin", "CVE-2019-15107", "RCE", "gestión de parches", "red/blue"]),
+
+    # --- Pista D (ampliación) · Operaciones de datos en producción ----------
+    ("107", "Migración de datos en producción", "D", 3, ["Datos", "SRE"],
+     "Migra una columna de una tabla grande con usuarios comprando (tráfico k6). Hazlo online (expand/contract) sin tumbar la tienda con un lock.",
+     ["postgres", "zero-downtime", "locks", "expand/contract", "k6"]),
+    ("108", "Restaurar un backup y reconectar la app", "D", 2, ["Datos", "SRE"],
+     "Se perdió la base de producción. Elige el backup bueno, restáuralo y reconecta la app (DSN + reinicio) hasta que /health vuelva a 200.",
+     ["postgres", "backup", "pg_restore", "DSN", "incidente"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
@@ -328,8 +414,11 @@ LAB_CURSOS = {
     # Pista E · anti-DDoS (curso 14)
     "79": ["14", "09"], "80": ["14"], "81": ["14"], "82": ["14", "13"],
     "83": ["14", "11"], "84": ["14", "11", "09"],
+    # Pista F · pipeline / runtime
+    "85": ["08"], "86": ["08"], "87": ["13"], "88": ["13"],
+    "91": ["13"], "92": ["13"], "93": ["13"], "94": ["13"], "96": ["13"],
 }
-ID_RE = re.compile(r"^\d{2}$")
+ID_RE = re.compile(r"^\d{2,3}$")
 
 
 def lab_dir(lab_id):
@@ -350,13 +439,14 @@ def compose_file(lab_id):
     return f if os.path.isfile(f) else None
 
 
-def run(args, timeout=600):
+def run(args, timeout=600, env=None):
     """Ejecuta un comando (lista de args, sin shell) y devuelve (code, salida)."""
     try:
         # UTF-8 explícito: en Windows el locale por defecto (cp1252) no decodifica
         # la salida de check.sh (✓, emojis) ni el progreso de docker build.
         p = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=timeout)
+                           encoding="utf-8", errors="replace", timeout=timeout,
+                           env=({**os.environ, **env} if env else None))
         return p.returncode, (p.stdout + p.stderr)
     except subprocess.TimeoutExpired:
         return 124, "Tiempo agotado ejecutando el comando."
@@ -366,12 +456,54 @@ def run(args, timeout=600):
         return 1, f"Error: {e}"
 
 
-def dc(lab_id, *cmd, timeout=600):
+def dc(lab_id, *cmd, timeout=600, env=None):
     """docker compose -f <lab>/docker-compose.yml <cmd...>"""
     cf = compose_file(lab_id)
     if not cf:
         return 1, "Lab inexistente."
-    return run(["docker", "compose", "-f", cf, *cmd], timeout=timeout)
+    return run(["docker", "compose", "-f", cf, *cmd], timeout=timeout, env=env)
+
+
+# ---------------------------------------------------------------------------
+# Modo red / blue (labs estilo HTB con contenedor atacante)
+# ---------------------------------------------------------------------------
+# Un lab es "red-capaz" si su compose define el servicio 'attacker' tras el
+# profile 'red'. En blue se publica la terminal del target (ttyd) en el puerto
+# host; en red se publica la del contenedor atacante y el target queda sin
+# shell, solo accesible por la red Docker. Las banderas (user/root) las lee el
+# servidor del target con `docker exec -u 0` y las valida contra lo que envía
+# el alumno desde la web.
+_RED_CACHE = {}
+
+
+def red_capable(lab_id):
+    if lab_id in _RED_CACHE:
+        return _RED_CACHE[lab_id]
+    cf = compose_file(lab_id)
+    ok = False
+    if cf:
+        try:
+            with open(cf, encoding="utf-8") as f:
+                txt = f.read()
+            ok = "attacker:" in txt and "profiles:" in txt
+        except OSError:
+            ok = False
+    _RED_CACHE[lab_id] = ok
+    return ok
+
+
+def read_flags(lab_id):
+    """{'user': 'TCLAB{..}', 'root': 'TCLAB{..}'} leído del target (como root)."""
+    code, out = run(["docker", "exec", "-u", "0", f"tc-lab-{lab_id}",
+                     "cat", "/opt/lab/.flags"], timeout=20)
+    if code != 0:
+        return {}
+    flags = {}
+    for line in out.splitlines():
+        k, _, v = line.strip().partition("=")
+        if k and v:
+            flags[k.strip().lower()] = v.strip()
+    return flags
 
 
 def container_running(lab_id):
@@ -380,7 +512,7 @@ def container_running(lab_id):
     return code == 0 and "true" in out.lower()
 
 
-RUNNING_RE = re.compile(r"^tc-lab-(\d{2})$")
+RUNNING_RE = re.compile(r"^tc-lab-(\d{2,3})$")
 
 
 def lab_states():
@@ -413,6 +545,8 @@ PENDING = {}   # id -> epoch en que se destruye (lab resuelto, en cuenta atrás)
 KEPT = set()   # ids que el usuario pidió mantener tras resolver
 BUSY = set()   # ids con start/reset/stop en curso: el reaper no los toca
 STARTED = {}   # id -> epoch de arranque del contenedor (para el TTL)
+MODE = {}      # id -> "red" | "blue" con el que se arrancó
+CAPTURED = {}  # id -> set() de banderas ya capturadas en red ("user"/"root")
 
 
 def log(msg):
@@ -587,6 +721,8 @@ def labs_payload():
             "exists": lab_dir(lab_id) is not None,
             "running": lab_id in running,
             "ttydPort": TTYD_BASE + int(lab_id),
+            "redCapable": red_capable(lab_id),
+            "mode": MODE.get(lab_id),
         })
     return out
 
@@ -652,23 +788,33 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "no disponible"}, 404)
             with open(cp, encoding="utf-8") as f:
                 return self._json({"markdown": f.read()})
-        m = re.match(r"^/api/labs/(\d{2})/(reto|solucion|guia)$", path)
+        m = re.match(r"^/api/labs/(\d{2,3})/(reto|solucion|guia)$", path)
         if m:
             lab_id, kind = m.group(1), m.group(2)
             txt = read_md(lab_id, kind)
             if txt is None:
                 return self._json({"error": "no disponible"}, 404)
             return self._json({"markdown": txt})
-        m = re.match(r"^/api/labs/(\d{2})/status$", path)
+        m = re.match(r"^/api/labs/(\d{2,3})/status$", path)
         if m:
             lab_id = m.group(1)
             if lab_id not in LAB_BY_ID:
                 return self._json({"error": "lab inexistente"}, 404)
-            return self._json({
+            mode = MODE.get(lab_id)
+            payload = {
                 "running": container_running(lab_id),
                 "ttydPort": TTYD_BASE + int(lab_id),
+                "mode": mode,
+                "redCapable": red_capable(lab_id),
                 **lifecycle(lab_id),
-            })
+            }
+            if mode == "red" and payload["running"]:
+                flags = read_flags(lab_id)
+                with LOCK:
+                    cap = sorted(CAPTURED.get(lab_id, set()))
+                payload["flagKinds"] = sorted(flags)   # solo los nombres
+                payload["captured"] = cap
+            return self._json(payload)
         if path.startswith("/api/"):
             return self._json({"error": "ruta desconocida"}, 404)
         return self._file(path)
@@ -676,12 +822,56 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         url = urlparse(self.path)
         path = url.path
-        m = re.match(r"^/api/labs/(\d{2})/(start|stop|reset|check|keep)$", path)
+        m = re.match(r"^/api/labs/(\d{2,3})/(start|stop|reset|check|keep|flag)$",
+                     path)
         if not m:
             return self._json({"error": "ruta desconocida"}, 404)
         lab_id, action = m.group(1), m.group(2)
         if lab_dir(lab_id) is None:
             return self._json({"error": "lab inexistente"}, 404)
+
+        qs = url.query.split("&")
+        want_red = "mode=red" in qs and red_capable(lab_id)
+
+        # Envío de bandera (solo modo red): comparar contra lo que el target
+        # guarda en /opt/lab/.flags, que solo lee el servidor (docker exec -u 0).
+        if action == "flag":
+            if MODE.get(lab_id) != "red":
+                return self._json(
+                    {"ok": False, "error": "Las banderas solo se envían en red."},
+                    400)
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                body = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                body = {}
+            kind = str(body.get("kind", "")).lower()
+            value = str(body.get("value", "")).strip()
+            flags = read_flags(lab_id)
+            if not flags:
+                return self._json(
+                    {"ok": False,
+                     "error": "No pude leer las banderas (¿target corriendo?)."},
+                    409)
+            if kind not in flags:
+                return self._json(
+                    {"ok": False, "error": "Bandera desconocida: %s" % kind}, 400)
+            correct = bool(value) and value == flags[kind]
+            with LOCK:
+                cap = CAPTURED.setdefault(lab_id, set())
+                if correct:
+                    cap.add(kind)
+                captured = sorted(cap)
+                remaining = sorted(set(flags) - cap)
+            solved = correct and not remaining
+            if solved:
+                schedule_destroy(lab_id)
+            return self._json({
+                "ok": correct, "kind": kind, "correct": correct,
+                "captured": captured, "remaining": remaining,
+                "required": sorted(flags), "solved": solved,
+                **lifecycle(lab_id),
+            })
 
         # Levantar un lab con otros de la página ya corriendo consume RAM/CPU
         # de más: se rechaza con 409 salvo que el cliente confirme con ?force=1.
@@ -712,16 +902,41 @@ class Handler(BaseHTTPRequestHandler):
                 PENDING.pop(lab_id, None)
                 KEPT.discard(lab_id)
                 STARTED.pop(lab_id, None)
+                CAPTURED.pop(lab_id, None)
+            port = TTYD_BASE + int(lab_id)
+
+            def _up(force=()):
+                if want_red:
+                    env = {"TCLAB_MODE": "red", "ATTACKER_PUB": str(port),
+                           "TARGET_PUB": "0"}
+                    return dc(lab_id, "--profile", "red", "up", "-d",
+                              "--build", *force, env=env)
+                env = {"TCLAB_MODE": "blue", "TARGET_PUB": str(port),
+                       "ATTACKER_PUB": "0"}
+                return dc(lab_id, "up", "-d", "--build", *force, env=env)
+
+            def _down():
+                args = ["down", "-v", "--remove-orphans", "-t", "5"]
+                if red_capable(lab_id):
+                    args = ["--profile", "red", *args]
+                return dc(lab_id, *args)
+
             try:
                 if action == "start":
-                    code, out = dc(lab_id, "up", "-d", "--build")
+                    code, out = _up()
+                    if code == 0:
+                        with LOCK:
+                            MODE[lab_id] = "red" if want_red else "blue"
                 elif action == "stop":
-                    code, out = dc(lab_id, "down", "-v", "--remove-orphans",
-                                   "-t", "5")
+                    code, out = _down()
+                    with LOCK:
+                        MODE.pop(lab_id, None)
                 else:  # reset
-                    dc(lab_id, "down", "-v", "--remove-orphans", "-t", "5")
-                    code, out = dc(lab_id, "up", "-d", "--build",
-                                   "--force-recreate")
+                    _down()
+                    code, out = _up(force=("--force-recreate",))
+                    if code == 0:
+                        with LOCK:
+                            MODE[lab_id] = "red" if want_red else "blue"
             finally:
                 with LOCK:
                     BUSY.discard(lab_id)
@@ -731,6 +946,8 @@ class Handler(BaseHTTPRequestHandler):
             "code": code,
             "output": out[-20000:],  # recorta salidas enormes
             "running": container_running(lab_id),
+            "mode": MODE.get(lab_id),
+            "redCapable": red_capable(lab_id),
             **lifecycle(lab_id),
         })
 

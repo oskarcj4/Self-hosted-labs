@@ -139,3 +139,58 @@ Lado azul: distinguir un flood malicioso del tráfico legítimo de alto volumen 
 | 84 | `84-ir-postmortem-ddos` | Respuesta a incidentes tras un DDoS | `iptables hashlimit`/blocklist, postmortem blameless |
 
 > Nota sobre Cloudflare: es una CDN/WAF *alojada*, no corre en un contenedor. El lab 83 monta el equivalente local que sí controlas (reverse proxy con rate limiting); el curso 14 explica cuándo hace falta una CDN de verdad (floods volumétricos que saturan tu ancho de banda de entrada).
+
+# Pista F — Pipeline CI y runtime Docker (labs 85–96)
+
+Gates de CI, despliegue sin corte, supply chain y endurecimiento del contenedor.
+Escenarios, validadores y soluciones de implementación propia. 85–86: Debian 12
+con systemd y nginx. 87–96: Docker-in-Docker (`docker:27.5.1-dind`).
+
+| Lab | Carpeta | Tema | Técnicas clave |
+|-----|---------|------|----------------|
+| 85 | `85-parche-rolling` | Parche rolling sin downtime | dos backends, `systemctl restart` de la app, PID de nginx intacto |
+| 86 | `86-blue-green` | Cutover blue-green | upstream green→blue, `nginx reload`, green vivo para rollback |
+| 87 | `87-pipeline-secretos` | Pipeline CI que filtra secretos | token fuera del YAML, sin `docker.sock`, sin `pull_request` |
+| 88 | `88-gate-pipeline` | Gate de seguridad saltado | quitar `continue-on-error`, `needs:`, scan en verde |
+| 89 | `89-capabilities` | Capabilities y no-new-privileges | `cap_drop: ALL`, `no-new-privileges`, sin `SYS_ADMIN` |
+| 90 | `90-escape-host` | Cerrar vías de escape al host | sin privileged/sock/`/`/`pid: host`/`network: host` |
+| 91 | `91-admission-compose` | Admission: política de Compose | `docker compose config` + jq, 12 bypasses de red team, fail-closed, gate en `deploy.sh` |
+| 92 | `92-sbom-firmado` | SBOM firmado y verificado | ancla de confianza fija, SBOM con `apk info -v`, id de imagen atado, clave del atacante |
+| 93 | `93-iac-compose` | Scan IaC del Compose | escáner con corpus de tests, tag implícito/puerto de registro, `user: 0`, `${VAR:-true}` |
+| 94 | `94-xtrace-secreto` | xtrace que filtra el secreto | `set -eux` escondido, base64, artefactos, masking literal en el runner |
+| 95 | `95-seccomp` | seccomp: perfil propio | perfil derivado del default sin `ptrace`/`process_vm_*`, EPERM en runtime |
+| 96 | `96-actions-pin` | Actions sin pin de SHA | mirror git, `^{commit}` vs tag anotado, tag secuestrado, reusable workflows |
+
+# Pista G — AppSec web (labs 97–101)
+
+Apps web intencionadamente vulnerables, estilo máquinas fácil/media de Hack The
+Box. Cada lab se puede resolver de **dos formas**: 🔴 red (explotar y capturar la
+flag) o 🔵 blue (arreglar la vulnerabilidad). El validador acepta cualquiera de
+las dos vías. La flag solo la lee el usuario `app`; el alumno es `analista` sin
+sudo, así que debe explotar la app o arreglarla. `solucion/` trae **solo el
+arreglo** (blue), nunca el camino de explotación.
+
+| Lab | Carpeta | Tema | Arquetipo HTB / OWASP |
+|-----|---------|------|------------------------|
+| 97 | `97-web-sqli-login` | Portal con SQLi en el login | SQLi clásico en login · OWASP A03 |
+| 98 | `98-web-cmdi-dns` | Command injection en herramienta de red | parámetro a `shell=True` · OWASP A03 |
+| 99 | `99-web-ssrf-fetch` | Gateway con SSRF | fetcher confused-deputy a metadata interno · OWASP A10 |
+| 100 | `100-auth-jwt-weak` | API con JWT `alg:none` | confusión de algoritmo JWT · OWASP A07 |
+| 101 | `101-web-xxe-import` | Importador XML con XXE | entidad externa `lxml` lee fichero · OWASP A05 |
+
+# Pista H — Máquinas HTB (labs 102+)
+
+Máquinas vulnerables a propósito con **contenedor atacante**, estilo HTB. Al
+iniciar, un popup pregunta si juegas 🔴 red (sin acceso al target; atacas por la
+red desde una caja atacante y entregas las banderas **user** y **root**) o 🔵
+blue (acceso total + validador del arreglo). Mismo compose para ambos modos.
+
+| Lab | Carpeta | Tema | Clave |
+|-----|---------|------|-------|
+| 102 | `102-firewall-bypass` | Saltar / blindar un firewall | iptables: confianza en puerto de origen y orden de reglas |
+| 103 | `103-fuga-artefacto` | Panel con fuga de artefacto de build | backup del código en el webroot + modo debug · OWASP A05 |
+| 104 | `104-credenciales-y-errores` | Panel con credenciales por defecto | default creds + errores verbosos · OWASP A05/A07 |
+| 105 | `105-ssrf-metadatos` | Proxy de estado con SSRF | `/fetch` sin allowlist a metadata interno · OWASP A10 |
+| 106 | `106-traversal-y-autorizacion` | Visor con path traversal + autz rota | ruta sin saneo + `/admin` confía en cabecera · OWASP A01 |
+| 109 | `109-firewall-ssh-interno` | Saltar / blindar un firewall hasta el SSH | iptables: política por defecto `ACCEPT` + regla de SSH en protocolo equivocado |
+| 110 | `110-firewall-panel-sin-parchear` | Cruzar / parchear un firewall por un panel sin actualizar | firewall correcto, pero Webmin 1.920 expuesto · CVE-2019-15107 (RCE) · fix = actualizar |
