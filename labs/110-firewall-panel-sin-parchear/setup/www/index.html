@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>gateway.lab</title>
+<h1>gateway.lab — appliance de borde</h1>
+<p>Servicio público operativo. El firewall de este appliance está en
+<strong>lista blanca</strong>: solo se exponen la web pública (<code>80</code>)
+y el panel de administración (<code>10000</code>). La zona interna
+(<code>22</code> SSH, <code>8080</code> consola admin) queda protegida.</p>
+
+<h2>Administración</h2>
+<p>Panel de gestión <strong>Webmin</strong> en el puerto <code>10000</code>
+(HTTPS). Desde ahí se administra el appliance, incluidas sus reglas de
+firewall.</p>
+
+<h2>Inventario / versiones</h2>
+<ul>
+  <li>Webmin <code>1.920</code> — <em>pendiente de ventana de mantenimiento
+      para aplicar actualizaciones</em></li>
+</ul>
+
+<!-- TODO infra: el firewall quedó revisado y correcto. Falta aplicar las
+     actualizaciones del panel: la versión instalada tiene avisos de
+     seguridad abiertos. Programar la actualización. -->

@@ -1,0 +1,42 @@
+# Un solo compose sirve para los dos modos:
+#  - blue: solo 'lab' (target) con su terminal ttyd publicada -> acceso total.
+#  - red : profile 'red' levanta 'attacker' (su ttyd publicada) + 'lab' sin
+#          terminal; el target solo es accesible por la red interna 'labnet'.
+# El servidor fija TARGET_PUB / ATTACKER_PUB y TCLAB_MODE al arrancar.
+name: tclab-109
+
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-109
+    hostname: target
+    cap_add:
+      - NET_ADMIN          # necesario para iptables dentro del contenedor
+    environment:
+      - TCLAB_MODE=${TCLAB_MODE:-blue}
+    networks:
+      labnet:
+        aliases: [target, gateway.lab]
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:${TARGET_PUB:-7709}:7681"   # ttyd (solo sirve en blue)
+
+  attacker:
+    profiles: [red]
+    build:
+      context: .
+      dockerfile: Dockerfile.attacker
+    container_name: tc-lab-109-attacker
+    depends_on: [lab]
+    networks:
+      labnet:
+    tty: true
+    stdin_open: true
+    ports:
+      - "127.0.0.1:${ATTACKER_PUB:-7709}:7681"  # ttyd de la caja atacante
+
+networks:
+  labnet:
+    driver: bridge

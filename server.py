@@ -382,6 +382,12 @@ LABS = [
     ("106", "Visor de documentos: path traversal + bypass de autorización", "H", 3, ["Red", "Web"],
      "Descarga sin saneo de ruta y /admin que se fía de la cabecera X-Admin: captura user+root (red) o cierra ambas sin romper la descarga legítima (blue).",
      ["path traversal", "broken access control", "OWASP A01", "red/blue"]),
+    ("109", "Saltar (o blindar) un firewall hasta el SSH interno", "H", 3, ["Red", "Firewall"],
+     "Firewall en lista negra con una regla de SSH mal escrita: llega al 22 interno y pivota a la consola admin para capturar user+root (red) o pásalo a lista blanca (blue).",
+     ["iptables", "firewall bypass", "default policy", "ssh", "red/blue"]),
+    ("110", "Cruzar (o parchear) un firewall por un panel sin actualizar", "H", 3, ["Red", "Firewall"],
+     "Firewall correcto, pero el panel Webmin 1.920 expuesto es vulnerable a CVE-2019-15107 (RCE real): cruza el perímetro y captura user+root (red) o actualiza el panel y cierra el CVE sin tocar el firewall (blue).",
+     ["Webmin", "CVE-2019-15107", "RCE", "gestión de parches", "red/blue"]),
 
     # --- Pista D (ampliación) · Operaciones de datos en producción ----------
     ("107", "Migración de datos en producción", "D", 3, ["Datos", "SRE"],

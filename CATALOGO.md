@@ -188,3 +188,9 @@ blue (acceso total + validador del arreglo). Mismo compose para ambos modos.
 | Lab | Carpeta | Tema | Clave |
 |-----|---------|------|-------|
 | 102 | `102-firewall-bypass` | Saltar / blindar un firewall | iptables: confianza en puerto de origen y orden de reglas |
+| 103 | `103-fuga-artefacto` | Panel con fuga de artefacto de build | backup del código en el webroot + modo debug · OWASP A05 |
+| 104 | `104-credenciales-y-errores` | Panel con credenciales por defecto | default creds + errores verbosos · OWASP A05/A07 |
+| 105 | `105-ssrf-metadatos` | Proxy de estado con SSRF | `/fetch` sin allowlist a metadata interno · OWASP A10 |
+| 106 | `106-traversal-y-autorizacion` | Visor con path traversal + autz rota | ruta sin saneo + `/admin` confía en cabecera · OWASP A01 |
+| 109 | `109-firewall-ssh-interno` | Saltar / blindar un firewall hasta el SSH | iptables: política por defecto `ACCEPT` + regla de SSH en protocolo equivocado |
+| 110 | `110-firewall-panel-sin-parchear` | Cruzar / parchear un firewall por un panel sin actualizar | firewall correcto, pero Webmin 1.920 expuesto · CVE-2019-15107 (RCE) · fix = actualizar |

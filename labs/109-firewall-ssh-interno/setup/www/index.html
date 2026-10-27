@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>gateway.lab</title>
+<h1>gateway.lab — nodo de borde</h1>
+<p>Servicio público operativo. El resto del nodo está <strong>tras el
+firewall</strong>: solo el puerto <code>80</code> debería verse desde la red.</p>
+
+<h2>Estado de servicios internos</h2>
+<ul>
+  <li><code>22</code> — SSH de mantenimiento → <em>no accesible desde fuera</em></li>
+  <li><code>8080</code> — consola admin interna → <em>no accesible desde fuera</em></li>
+</ul>
+
+<h2>Notas de mantenimiento</h2>
+<p>Sesión de soporte operada por la cuenta <code>soporte</code>. Instalada por
+el proveedor; <strong>pendiente rotar la credencial de fábrica</strong> (misma
+que el nombre de usuario). La consola admin del <code>8080</code> no pide
+autenticación: se confía en que solo se alcance desde dentro del nodo.</p>
+
+<!-- TODO infra: revisar /srv/fw/rules.sh antes de la auditoría. La política
+     por defecto quedó en ACCEPT y la regla de 22 no parece surtir efecto. -->
