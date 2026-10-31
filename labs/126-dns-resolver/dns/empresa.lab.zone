@@ -1,0 +1,7 @@
+$TTL 300
+@           IN SOA ns1.empresa.lab. hostmaster.empresa.lab. 1 3600 600 86400 300
+@           IN NS  ns1
+ns1         IN A   10.126.0.53
+portal      IN A   10.126.0.80
+correo      IN A   10.126.0.81
+@           IN MX  10 correo

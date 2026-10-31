@@ -1,0 +1,3 @@
+# Servidores DHCP del lab 131 (el legítimo y el falso).
+FROM alpine:3.20
+RUN apk add --no-cache dnsmasq

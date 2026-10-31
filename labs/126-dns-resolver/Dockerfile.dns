@@ -1,0 +1,6 @@
+# DNS interno legítimo del lab 126 (bind9 + unbound).
+FROM debian:12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends bind9 unbound bind9-dnsutils \
+    && rm -rf /var/lib/apt/lists/*
+COPY dns/ /dns/
+CMD ["bash", "/dns/start.sh"]

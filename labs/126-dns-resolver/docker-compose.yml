@@ -1,0 +1,35 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-126
+    hostname: puesto-126
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      red: {ipv4_address: 10.126.0.10}
+    ports:
+      - "127.0.0.1:7726:7681"   # terminal web (ttyd)
+
+  dns:
+    build: {context: ., dockerfile: Dockerfile.dns}
+    container_name: tc-lab-126-dns
+    hostname: ns1
+    networks:
+      red: {ipv4_address: 10.126.0.53}
+
+  rogue:
+    build: {context: ., dockerfile: Dockerfile.rogue}
+    container_name: tc-lab-126-invitados
+    hostname: dns-invitados
+    cap_add: [NET_ADMIN]
+    networks:
+      red: {ipv4_address: 10.126.0.99}
+
+networks:
+  red:
+    ipam: {config: [{subnet: 10.126.0.0/24}]}

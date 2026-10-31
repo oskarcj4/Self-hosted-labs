@@ -1,0 +1,8 @@
+{
+  "name": "fecha-fmt",
+  "version": "1.4.0",
+  "description": "Formato de fechas en español",
+  "main": "index.js",
+  "license": "MIT",
+  "author": "Equipo Frontend <frontend@empresa.lab>"
+}

@@ -1,0 +1,38 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-135
+    hostname: build-135
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks: [interna]
+    ports:
+      - "127.0.0.1:7735:7681"   # terminal web (ttyd)
+
+  # Registro npm interno (verdaccio), sin salida a npmjs.org.
+  registry:
+    image: verdaccio/verdaccio:5.31.1
+    container_name: tc-lab-135-registry
+    volumes:
+      - ./registro/config.yaml:/verdaccio/conf/config.yaml:ro
+    networks: [interna]
+
+  # Publica los paquetes del lab en el registro al arrancar y termina.
+  publicador:
+    image: node:20-alpine
+    container_name: tc-lab-135-publicador
+    command: ["sh", "/registro/publicar.sh"]
+    volumes:
+      - ./registro:/registro:ro
+      - ./registro/paquetes:/paquetes:ro
+    networks: [interna]
+    depends_on: [registry]
+    restart: "no"
+
+networks:
+  interna:

@@ -1,0 +1,28 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-129
+    hostname: cliente-129
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      red: {ipv4_address: 10.129.0.10}
+    ports:
+      - "127.0.0.1:7729:7681"   # terminal web (ttyd)
+
+  descargas:
+    build: {context: ., dockerfile: Dockerfile.srv}
+    container_name: tc-lab-129-descargas
+    hostname: descargas
+    cap_add: [NET_ADMIN]
+    networks:
+      red: {ipv4_address: 10.129.0.80}
+
+networks:
+  red:
+    ipam: {config: [{subnet: 10.129.0.0/24}]}

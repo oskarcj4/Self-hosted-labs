@@ -1,0 +1,14 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-112
+    hostname: srv-rrhh-02
+    privileged: true      # systemd real + subsistema audit del kernel
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7712:7681"   # terminal web (ttyd)

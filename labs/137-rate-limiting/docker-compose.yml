@@ -1,0 +1,29 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-137
+    hostname: web-137
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      red: {ipv4_address: 10.137.0.10}
+    ports:
+      - "127.0.0.1:7737:7681"   # terminal web (ttyd)
+
+  # Bot que prueba contraseñas contra /api/login sin parar (~20 peticiones/s).
+  bot:
+    image: alpine:3.20
+    container_name: tc-lab-137-bot
+    hostname: bot
+    command: ["sh", "-c", "while :; do wget -q -O /dev/null --post-data 'usuario=admin&clave=intento' http://10.137.0.10/api/login 2>/dev/null; usleep 50000; done"]
+    networks:
+      red: {ipv4_address: 10.137.0.66}
+
+networks:
+  red:
+    ipam: {config: [{subnet: 10.137.0.0/24}]}

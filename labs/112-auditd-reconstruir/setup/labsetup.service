@@ -1,0 +1,11 @@
+[Unit]
+Description=TerminalCero Lab 112: planta el escenario
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '[ -e /opt/lab/.planted ] || { /opt/lab/plant.sh > /var/log/tclab-plant.log 2>&1 && touch /opt/lab/.planted && rm -rf /opt/lab/setup /opt/lab/plant.sh; }; [ -e /opt/lab/.planted ] && touch /run/tclab-ready || touch /run/tclab-failed'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

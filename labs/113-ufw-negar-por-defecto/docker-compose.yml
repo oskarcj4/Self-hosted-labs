@@ -1,0 +1,30 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-113
+    hostname: web-113
+    privileged: true      # systemd real + NET_ADMIN para ufw/iptables
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks: [dmz]
+    volumes:
+      - escaneo:/srv/escaneo:ro
+    ports:
+      - "127.0.0.1:7713:7681"   # terminal web (ttyd)
+  # "Internet": escanea el servidor cada 15 s y deja el resultado en /srv/escaneo.
+  externo:
+    build:
+      context: .
+      dockerfile: Dockerfile.scanner
+    container_name: tc-lab-113-externo
+    networks: [dmz]
+    volumes:
+      - escaneo:/out
+networks:
+  dmz:
+volumes:
+  escaneo:

@@ -1,0 +1,3 @@
+#!/bin/bash
+# Limpia temporales de la app de más de 7 días.
+find /var/tmp/app -type f -mtime +7 -delete 2>/dev/null || true

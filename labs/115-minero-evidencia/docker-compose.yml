@@ -1,0 +1,25 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-115
+    hostname: web-115
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks: [inet]
+    ports:
+      - "127.0.0.1:7715:7681"   # terminal web (ttyd)
+  # "Pool de minería" externo: sólo acepta la conexión y la mantiene abierta.
+  pool:
+    image: busybox:1.36
+    container_name: tc-lab-115-pool
+    command: ["sh", "-c", "while :; do tail -f /dev/null | nc -l -p 3333 > /dev/null; done"]
+    networks:
+      inet:
+        aliases: [pool.minexmr.lab]
+networks:
+  inet:

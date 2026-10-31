@@ -1,0 +1,4 @@
+# Escáner "desde Internet" del lab 113.
+FROM alpine:3.20
+RUN apk add --no-cache nmap
+CMD ["sh", "-c", "while :; do nmap -Pn -n --max-retries 1 --host-timeout 20s -p 22,80,443,3306,6379,8080 lab -oG - 2>/dev/null | grep Ports > /out/.tmp && { date -u +%FT%TZ; cat /out/.tmp; } > /out/ultimo.txt; sleep 15; done"]

