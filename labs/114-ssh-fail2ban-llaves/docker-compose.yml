@@ -1,0 +1,24 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-114
+    hostname: bastion-114
+    privileged: true      # systemd real + iptables para fail2ban
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks: [inet]
+    ports:
+      - "127.0.0.1:7714:7681"   # terminal web (ttyd)
+  # Bot de fuerza bruta: prueba contraseñas contra root@lab cada pocos segundos.
+  atacante:
+    build:
+      context: .
+      dockerfile: Dockerfile.atacante
+    container_name: tc-lab-114-atacante
+    networks: [inet]
+networks:
+  inet:

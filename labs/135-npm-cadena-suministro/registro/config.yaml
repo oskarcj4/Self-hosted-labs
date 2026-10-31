@@ -1,0 +1,12 @@
+# Registro npm interno del lab 135 (sin acceso a npmjs.org).
+storage: /verdaccio/storage/data
+auth:
+  htpasswd:
+    file: /verdaccio/storage/htpasswd
+    max_users: 1
+uplinks: {}
+packages:
+  '**':
+    access: $all
+    publish: $authenticated
+log: {type: stdout, format: pretty, level: warn}

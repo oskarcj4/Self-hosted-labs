@@ -1,0 +1,47 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-131
+    hostname: portatil-131
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      gestion: {}
+      lan: {ipv4_address: 10.131.0.10}
+    ports:
+      - "127.0.0.1:7731:7681"   # terminal web (ttyd)
+
+  # DHCP oficial de la oficina (contesta con 2 s de retraso: está cargado).
+  dhcp:
+    build: {context: ., dockerfile: Dockerfile.dhcp}
+    container_name: tc-lab-131-dhcp
+    hostname: dhcp-oficina
+    cap_add: [NET_ADMIN]
+    command: ["dnsmasq", "-k", "--port=0", "--log-dhcp", "--log-facility=-", "--dhcp-authoritative",
+              "--dhcp-range=10.131.0.100,10.131.0.150,255.255.255.0,10m",
+              "--dhcp-option=3,10.131.0.2", "--dhcp-option=6,10.131.0.2", "--dhcp-reply-delay=2"]
+    networks:
+      lan: {ipv4_address: 10.131.0.2}
+
+  # Un equipo que alguien conectó a la red con un servidor DHCP propio.
+  impostor:
+    build: {context: ., dockerfile: Dockerfile.dhcp}
+    container_name: tc-lab-131-impostor
+    hostname: router-wifi-barato
+    cap_add: [NET_ADMIN]
+    mac_address: "02:42:de:ad:be:ef"
+    command: ["dnsmasq", "-k", "--port=0", "--log-dhcp", "--log-facility=-",
+              "--dhcp-range=10.131.0.200,10.131.0.250,255.255.255.0,10m",
+              "--dhcp-option=3,10.131.0.66", "--dhcp-option=6,10.131.0.66"]
+    networks:
+      lan: {ipv4_address: 10.131.0.66}
+
+networks:
+  gestion:
+  lan:
+    ipam: {config: [{subnet: 10.131.0.0/24}]}

@@ -1,0 +1,21 @@
+# Promtail: recoge los logs de cada servidor y los etiqueta (host, job).
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: servidores
+    static_configs:
+      - targets: [localhost]
+        labels: {job: nginx, host: web-01, __path__: /var/log/servers/web-01/access.log}
+      - targets: [localhost]
+        labels: {job: auth, host: ssh-01, __path__: /var/log/servers/ssh-01/auth.log}
+      - targets: [localhost]
+        labels: {job: auth, host: db-01, __path__: /var/log/servers/db-01/auth.log}

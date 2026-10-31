@@ -1,0 +1,8 @@
+{
+  "name": "color-utils",
+  "version": "2.1.0",
+  "description": "Conversión de colores hex/rgb/hsl",
+  "main": "index.js",
+  "license": "MIT",
+  "author": "Equipo Frontend <frontend@empresa.lab>"
+}

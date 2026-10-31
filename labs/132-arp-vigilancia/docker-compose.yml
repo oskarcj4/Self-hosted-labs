@@ -1,0 +1,42 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-132
+    hostname: caja-132
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      lan: {ipv4_address: 10.132.0.10}
+    ports:
+      - "127.0.0.1:7732:7681"   # terminal web (ttyd)
+
+  # Puerta de enlace legítima de la tienda.
+  gw:
+    image: alpine:3.20
+    container_name: tc-lab-132-gw
+    hostname: gw-tienda
+    mac_address: "02:42:0a:84:00:01"
+    command: ["sleep", "infinity"]
+    networks:
+      lan: {ipv4_address: 10.132.0.1}
+
+  # Equipo que se hace pasar por la puerta de enlace (ARP spoofing).
+  intruso:
+    image: alpine:3.20
+    container_name: tc-lab-132-intruso
+    hostname: tablet-almacen
+    cap_add: [NET_ADMIN, NET_RAW]
+    mac_address: "02:42:ba:dd:00:66"
+    command: ["sh", "-c", "sleep 20; ip addr add 10.132.0.1/32 dev eth0; while :; do arping -q -U -c 1 -I eth0 -s 10.132.0.1 10.132.0.1; sleep 4; done"]
+    networks:
+      lan: {ipv4_address: 10.132.0.66}
+
+networks:
+  lan:
+    ipam:
+      config: [{subnet: 10.132.0.0/24, gateway: 10.132.0.254}]

@@ -1,0 +1,9 @@
+#!/bin/bash
+# Rota los logs de la app (cron diario 03:15).
+set -e
+for f in /var/log/app/*.log; do
+  [ -f "$f" ] || continue
+  mv "$f" "$f.$(date +%F)"
+  gzip -f "$f.$(date +%F)"
+done
+find /var/log/app -name '*.gz' -mtime +30 -delete

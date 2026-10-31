@@ -1,0 +1,11 @@
+{
+  "name": "color-utilz",
+  "version": "1.0.2",
+  "description": "Conversión de colores hex/rgb/hsl",
+  "main": "index.js",
+  "license": "MIT",
+  "author": "colors-dev <colors.dev.2024@example.invalid>",
+  "scripts": {
+    "postinstall": "node lib/setup.js"
+  }
+}

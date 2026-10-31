@@ -1,0 +1,4 @@
+# Servidor de descargas del lab 129: su enlace pierde paquetes (netem).
+FROM alpine:3.20
+RUN apk add --no-cache python3 iproute2 iproute2-tc
+CMD ["sh", "-c", "mkdir -p /srv && head -c 4000000 /dev/urandom > /srv/grande.bin && echo hola > /srv/index.html && tc qdisc add dev eth0 root netem delay 15ms loss 6% && cd /srv && exec python3 -m http.server 8080"]

@@ -1,0 +1,57 @@
+# Topología: lab (10.125.1.10) → r1-oficina → isp-transito → srv-app (10.125.3.10)
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-125
+    hostname: oficina-125
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      lan: {ipv4_address: 10.125.1.10}
+    ports:
+      - "127.0.0.1:7725:7681"   # terminal web (ttyd)
+
+  r1:
+    build: {context: ., dockerfile: Dockerfile.router}
+    container_name: tc-lab-125-r1
+    hostname: r1-oficina
+    cap_add: [NET_ADMIN]
+    sysctls: {net.ipv4.ip_forward: 1}
+    command: ["sh", "-c", "ip route add 10.125.3.0/24 via 10.125.2.3; exec sleep infinity"]
+    networks:
+      lan: {ipv4_address: 10.125.1.2}
+      transito: {ipv4_address: 10.125.2.2}
+
+  # Router del proveedor: su enlace de vuelta pierde y retrasa paquetes.
+  isp:
+    build: {context: ., dockerfile: Dockerfile.router}
+    container_name: tc-lab-125-isp
+    hostname: isp-transito
+    cap_add: [NET_ADMIN]
+    sysctls: {net.ipv4.ip_forward: 1}
+    command: ["sh", "-c", "ip route add 10.125.1.0/24 via 10.125.2.2; IF=$$(ip -o -4 addr show | awk '/10.125.2.3\\//{print $$2}'); tc qdisc add dev $$IF root netem delay 70ms 15ms loss 25%; exec sleep infinity"]
+    networks:
+      transito: {ipv4_address: 10.125.2.3}
+      dc: {ipv4_address: 10.125.3.2}
+
+  srv:
+    build: {context: ., dockerfile: Dockerfile.router}
+    container_name: tc-lab-125-srv
+    hostname: srv-app
+    cap_add: [NET_ADMIN]
+    command: ["sh", "-c", "ip route add 10.125.1.0/24 via 10.125.3.2; ip route add 10.125.2.0/24 via 10.125.3.2; exec sleep infinity"]
+    networks:
+      dc: {ipv4_address: 10.125.3.10}
+
+networks:
+  lan:
+    ipam: {config: [{subnet: 10.125.1.0/24}]}
+  transito:
+    ipam: {config: [{subnet: 10.125.2.0/24}]}
+  dc:
+    ipam: {config: [{subnet: 10.125.3.0/24}]}

@@ -1,0 +1,7 @@
+$TTL 300
+@           IN SOA ns1.empresa.lab. hostmaster.empresa.lab. 1 3600 600 86400 300
+@           IN NS  ns1.empresa.lab.
+25          IN PTR backup-nas.empresa.lab.
+53          IN PTR ns1.empresa.lab.
+80          IN PTR portal.empresa.lab.
+81          IN PTR correo.empresa.lab.

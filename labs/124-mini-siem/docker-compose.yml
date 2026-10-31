@@ -1,0 +1,71 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-124
+    hostname: soc-124
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    environment:
+      LOKI_ADDR: http://loki:3100
+    volumes:
+      - reglas:/etc/siem/reglas
+    networks: [soc]
+    ports:
+      - "127.0.0.1:7724:7681"   # terminal web (ttyd)
+
+  # Los "servidores" (web-01, ssh-01, db-01) escriben sus logs en un volumen.
+  servidores:
+    image: python:3.12-alpine
+    container_name: tc-lab-124-servidores
+    command: ["python3", "-u", "/gen/generador.py"]
+    volumes:
+      - ./siem/generador.py:/gen/generador.py:ro
+      - logs:/var/log/servers
+    networks: [soc]
+
+  # Agente que envía los logs al punto central.
+  promtail:
+    image: grafana/promtail:3.1.1
+    container_name: tc-lab-124-promtail
+    command: ["-config.file=/etc/promtail/promtail.yml"]
+    volumes:
+      - ./siem/promtail.yml:/etc/promtail/promtail.yml:ro
+      - logs:/var/log/servers:ro
+    networks: [soc]
+    depends_on: [loki]
+
+  # Punto central: almacena los logs y evalúa las reglas de detección.
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: tc-lab-124-loki
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./siem/loki.yml:/etc/loki/loki.yml:ro
+      - reglas:/loki/rules/fake:ro
+    networks: [soc]
+
+  # Interfaz web (opcional): http://127.0.0.1:3124 → Explore → Loki.
+  grafana:
+    image: grafana/grafana:11.1.4
+    container_name: tc-lab-124-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./siem/grafana-datasource.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
+    networks: [soc]
+    ports:
+      - "127.0.0.1:3124:3000"
+    depends_on: [loki]
+
+networks:
+  soc:
+volumes:
+  logs:
+  reglas:

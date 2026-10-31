@@ -1,0 +1,43 @@
+# Loki de un solo nodo con el ruler activado (reglas de detección del SOC).
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  log_level: warn
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /tmp/loki-rules
+  enable_api: true
+  evaluation_interval: 15s
+  poll_interval: 15s
+  ring:
+    kvstore:
+      store: inmemory
+
+analytics:
+  reporting_enabled: false
