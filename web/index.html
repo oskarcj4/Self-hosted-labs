@@ -17,20 +17,15 @@
         <span class="brand__mark" aria-hidden="true">▲</span>
         <span class="brand__name">TerminalCero<span class="brand__dim"> Lab</span></span>
       </a>
-      <nav class="nav__links" aria-label="Pistas">
-        <button class="chip" data-filter="all" aria-pressed="true">Todos</button>
-        <button class="chip" data-filter="A">Detección</button>
-        <button class="chip" data-filter="B">Hardening</button>
-        <button class="chip" data-filter="C">30 días</button>
-        <button class="chip" data-filter="D">SRE</button>
-        <button class="chip" data-filter="E">anti-DDoS</button>
-        <button class="chip" data-filter="F">Pipeline</button>
-        <button class="chip" data-filter="G">AppSec web</button>
-        <button class="chip" data-filter="H">HTB</button>
-        <button class="chip" data-filter="I">Host</button>
-        <button class="chip" data-filter="J">SOC y redes</button>
-        <button class="chip" data-filter="K">Web hardening</button>
-        <span class="nav__sep" aria-hidden="true"></span>
+      <nav class="nav__links" aria-label="Principal">
+        <div class="menu" id="trackMenu">
+          <button class="chip menu__btn" id="trackBtn" aria-haspopup="true" aria-expanded="false" aria-controls="trackList" aria-pressed="true">
+            <span>Labs</span>
+            <span class="menu__current" id="trackCurrent">Todos</span>
+            <svg class="menu__caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="menu__panel" id="trackList" role="menu" aria-label="Filtrar por pista" hidden></div>
+        </div>
         <button class="chip" data-route="cursos" aria-pressed="false">Cursos</button>
       </nav>
       <button class="badge live run-indicator" id="runIndicator" hidden aria-label="Ver labs en ejecución"></button>
