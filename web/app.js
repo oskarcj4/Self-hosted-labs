@@ -429,8 +429,12 @@ function route() {
 /* Resalta en el nav "Cursos" o el filtro de pista activo. */
 function setNav(section) {
   view.classList.remove("container--wide"); // solo la pestaña Terminal usa el ancho completo
-  document.querySelectorAll(".chip[data-filter]").forEach((x) =>
-    x.setAttribute("aria-pressed", section !== "cursos" && x.dataset.filter === STATE.filter));
+  document.querySelectorAll(".menu__item[data-filter]").forEach((x) =>
+    x.setAttribute("aria-checked", x.dataset.filter === STATE.filter));
+  const btn = document.getElementById("trackBtn");
+  btn.setAttribute("aria-pressed", section !== "cursos");
+  document.getElementById("trackCurrent").textContent =
+    STATE.filter === "all" ? "Todos" : TRACKS[STATE.filter].split(" (")[0];
   const c = document.querySelector('.chip[data-route="cursos"]');
   if (c) c.setAttribute("aria-pressed", section === "cursos");
 }
@@ -944,11 +948,49 @@ function initTheme() {
   });
 }
 
+/* Menú desplegable de pistas: sustituye la fila de chips que saturaba el nav. */
+function buildTrackMenu() {
+  const count = (t) => STATE.labs.filter((l) => t === "all" || l.track === t).length;
+  const item = (t, label) => `
+    <button class="menu__item" role="menuitemradio" data-filter="${t}" aria-checked="${t === STATE.filter}">
+      <span class="menu__key">${t === "all" ? "∗" : t}</span>
+      <span class="menu__label">${esc(label)}</span>
+      <span class="menu__count">${count(t)}</span>
+    </button>`;
+  document.getElementById("trackList").innerHTML =
+    item("all", "Todas las pistas") + '<div class="menu__sep" role="separator"></div>' +
+    Object.entries(TRACKS).map(([t, label]) => item(t, label)).join("");
+}
+
 function initFilters() {
-  document.querySelectorAll(".chip[data-filter]").forEach((c) => c.addEventListener("click", () => {
-    STATE.filter = c.dataset.filter;
+  const menu = document.getElementById("trackMenu");
+  const btn = document.getElementById("trackBtn");
+  const panel = document.getElementById("trackList");
+  const items = () => [...panel.querySelectorAll(".menu__item")];
+  const setOpen = (open, focusFirst) => {
+    panel.hidden = !open;
+    btn.setAttribute("aria-expanded", open);
+    if (open && focusFirst) (panel.querySelector('[aria-checked="true"]') || items()[0])?.focus();
+  };
+  btn.addEventListener("click", () => setOpen(panel.hidden, false));
+  btn.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setOpen(true, true); }
+  });
+  panel.addEventListener("click", (e) => {
+    const it = e.target.closest(".menu__item");
+    if (!it) return;
+    STATE.filter = it.dataset.filter;
+    setOpen(false);
     renderHome();
-  }));
+  });
+  panel.addEventListener("keydown", (e) => {
+    const list = items(), i = list.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+    else if (e.key === "Escape") { setOpen(false); btn.focus(); }
+  });
+  document.addEventListener("click", (e) => { if (!menu.contains(e.target)) setOpen(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) { setOpen(false); btn.focus(); } });
   document.querySelector('.chip[data-route="cursos"]').addEventListener("click", renderCourses);
   // Enlaces internos (#cursos, #curso/NN, #lab/NN) y botones atrás/adelante.
   window.addEventListener("hashchange", route);
@@ -975,6 +1017,7 @@ async function boot() {
     ]);
     STATE.labs = d.labs;
     STATE.cursos = c.cursos || [];
+    buildTrackMenu();
     loadPopouts(); // pestañas de terminal abiertas antes de recargar
     route(); // abre directamente la vista de la URL (p.ej. /#cursos)
     initPolling();
