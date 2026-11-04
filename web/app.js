@@ -2,7 +2,7 @@
 "use strict";
 
 const view = document.getElementById("view");
-const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)", H: "Máquinas HTB (red / blue)", I: "Defensa del host", J: "Monitoreo, SOC y redes", K: "Hardening web" };
+const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)", H: "Máquinas HTB (red / blue)", I: "Defensa del host", J: "Monitoreo, SOC y redes", K: "Hardening web", L: "En tu sistema: guías (bajo tu riesgo)", M: "DevOps: incidentes reales" };
 let STATE = { labs: [], cursos: [], filter: "all", view: "home" };
 const POLL_MS = 8000; // refresco de "labs en ejecución"
 
@@ -142,7 +142,7 @@ const liveBadge = '<span class="badge live"><span class="dot"></span>activo</spa
 function cardHTML(l) {
   return `<article class="card" tabindex="0" role="button" data-id="${l.id}" aria-label="Abrir lab ${l.id}: ${esc(l.name)}">
     <div class="card__top">
-      <span class="card__id">LAB ${l.id}</span>
+      <span class="card__id">${l.local ? "GUÍA" : "LAB"} ${l.id}</span>
       <span class="card__state">${l.running ? liveBadge : diffDots(l.difficulty)}</span>
     </div>
     <div class="card__cats">${catsHTML(l)}</div>
@@ -513,7 +513,7 @@ function renderHome() {
   setHash("");
   setNav("home");
   const labs = STATE.labs.filter((l) => STATE.filter === "all" || l.track === STATE.filter);
-  const byTrack = { A: [], B: [], C: [], D: [], E: [], F: [], G: [], H: [], I: [], J: [], K: [] };
+  const byTrack = { A: [], B: [], C: [], D: [], E: [], F: [], G: [], H: [], I: [], J: [], K: [], L: [], M: [] };
   labs.forEach((l) => byTrack[l.track].push(l));
   const trackHTML = (t) => (STATE.filter === "all" || STATE.filter === t)
     ? `<div class="section-label">${TRACKS[t]}</div>
@@ -537,6 +537,8 @@ function renderHome() {
     ${trackHTML("I")}
     ${trackHTML("J")}
     ${trackHTML("K")}
+    ${trackHTML("L")}
+    ${trackHTML("M")}
   `;
 
   bindRunningPanel(view.querySelector("#runningSlot"));
@@ -548,9 +550,49 @@ function renderHome() {
   });
 }
 
+/* Guías "en tu sistema": sin contenedor ni terminal; sólo texto y aviso de riesgo. */
+function renderLocal(l) {
+  view.innerHTML = `
+    <a class="detail__back" href="#" id="back">← Todos los labs</a>
+    <div class="detail__head">
+      <div>
+        <div class="card__id">GUÍA ${l.id} · ${TRACKS[l.track]}</div>
+        <h1 class="detail__title">${esc(l.name)}</h1>
+        ${l.description ? `<p class="detail__desc">${esc(l.description)}</p>` : ""}
+        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)}</div>
+      </div>
+    </div>
+    <div class="notice" role="note">⚠ <strong>Sin contenedor:</strong> esta guía se aplica en <strong>tu propio sistema y bajo tu propio riesgo</strong>.
+      Vamos a endurecer las políticas de dispositivos externos de tu equipo. Mejor en una máquina virtual con snapshot,
+      y lee antes la sección <em>Deshacer todo</em>. La verificación es un script que sólo lee: <code>labs/${esc(l.dir || "")}/</code>.</div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-panel="reto" aria-selected="true">Guía</button>
+      <button class="tab" role="tab" data-panel="guia">Resolución guiada</button>
+      <button class="tab" role="tab" data-panel="sol">Solución</button>
+    </div>
+    <div class="panel active" data-panel="reto"><div class="md" id="mdReto">Cargando…</div></div>
+    <div class="panel" data-panel="guia"><div class="md" id="mdGuia">Cargando…</div></div>
+    <div class="panel" data-panel="sol"><div class="md" id="mdSol">Cargando…</div></div>
+  `;
+  view.querySelector("#back").addEventListener("click", (e) => { e.preventDefault(); renderHome(); });
+  const tabs = [...view.querySelectorAll(".tab")];
+  tabs.forEach((t) => t.addEventListener("click", () => {
+    tabs.forEach((x) => x.setAttribute("aria-selected", x === t));
+    view.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === t.dataset.panel));
+  }));
+  const load = (kind, sel) => api(`/api/labs/${l.id}/${kind}`)
+    .then((d) => { view.querySelector(sel).innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
+    .catch(() => { view.querySelector(sel).textContent = "No disponible."; });
+  load("reto", "#mdReto"); load("guia", "#mdGuia"); load("solucion", "#mdSol");
+}
+
 async function renderDetail(id) {
   const l = STATE.labs.find((x) => x.id === id);
   if (!l) return renderHome();
+  if (l.local) {
+    STATE.view = id; setHash("#lab/" + id); setNav("home"); window.scrollTo(0, 0);
+    return renderLocal(l);
+  }
   STATE.view = id;
   setHash("#lab/" + id);
   setNav("home");

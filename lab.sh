@@ -39,7 +39,14 @@ lab_dir() {
   echo "$d"
 }
 
-compose() { docker compose -f "$1/docker-compose.yml" "${@:2}"; }
+# Guías sin contenedor (pista L): se aplican en tu propio sistema, bajo tu riesgo.
+need_compose() {
+  [ -f "$1/docker-compose.yml" ] && return 0
+  echo "El lab $(basename "$1") es una guía SIN contenedor: se aplica en tu propio sistema y bajo tu propio riesgo." >&2
+  echo "Léela en $1/RETO.md y verifica con el script verificar.* de esa carpeta." >&2
+  exit 1
+}
+compose() { need_compose "$1"; docker compose -f "$1/docker-compose.yml" "${@:2}"; }
 destroy() { echo ">>> Destruyendo lab $(basename "$1")…"; compose "$1" down -v --remove-orphans -t 5; }
 lab_id() { basename "$1" | cut -d- -f1; }
 solved() { docker exec "tc-lab-$(lab_id "$1")" test -e "$MARKER" 2>/dev/null; }
@@ -95,7 +102,7 @@ case "$cmd" in
     destroy "$d"
     ;;
   stop-all)
-    for d in "$LABS"/*/; do compose "$d" down -v --remove-orphans -t 5 || true; done
+    for d in "$LABS"/*/; do [ -f "$d/docker-compose.yml" ] && { compose "$d" down -v --remove-orphans -t 5 || true; }; done
     ;;
   reap)
     docker ps -a --filter name=tc-lab- --format '{{.Names}} {{.State}}' | while read -r name state; do

@@ -194,3 +194,90 @@ blue (acceso total + validador del arreglo). Mismo compose para ambos modos.
 | 106 | `106-traversal-y-autorizacion` | Visor con path traversal + autz rota | ruta sin saneo + `/admin` confía en cabecera · OWASP A01 |
 | 109 | `109-firewall-ssh-interno` | Saltar / blindar un firewall hasta el SSH | iptables: política por defecto `ACCEPT` + regla de SSH en protocolo equivocado |
 | 110 | `110-firewall-panel-sin-parchear` | Cruzar / parchear un firewall por un panel sin actualizar | firewall correcto, pero Webmin 1.920 expuesto · CVE-2019-15107 (RCE) · fix = actualizar |
+
+# Pista L — Guías en tu sistema (labs 138+)
+
+Guías **sin contenedor**: se aplican en tu propio equipo (Linux o Windows) y
+**bajo tu propio riesgo**, porque endurecen las políticas de dispositivos
+externos de la máquina real. Recomendado: máquina virtual con snapshot. Cada
+guía trae su sección "Deshacer todo" y un script `verificar.*` que sólo lee la
+configuración. En la web no tienen botón de iniciar ni terminal.
+
+| Lab | Plan | Carpeta | Tema | Clave |
+|-----|------|---------|------|-------|
+| 138 | M4a | `138-usb-estacionamiento-linux` | USB del estacionamiento, Linux | usbguard (lista de permitidos, anti-BadUSB), `usb-storage`/`uas` fuera, udisks2 `noexec`, auditd + journalctl |
+| 139 | M4b | `139-usb-estacionamiento-windows` | USB del estacionamiento, Windows | forense USBSTOR + `setupapi.dev.log`, AutoRun, `RemovableStorageDevices`, `DeviceInstall\Restrictions`, eventos 6416/4663 |
+
+# Pista M — DevOps: incidentes reales (labs 140+)
+
+| Lab | Plan | Carpeta | Tema | Clave |
+|-----|------|---------|------|-------|
+| 140 | D1 | `140-pipeline-que-hoy-falla` | El pipeline que hoy falla | Gitea + Woodpecker (backend local), lockfile con `--require-hashes`, clave de caché por hash del lockfile |
+| 141 | D2 | `141-rollback-blue-green` | Rollback en menos de 2 minutos | HAProxy blue/green, `httpchk /health`, runtime API (`level admin`), reload sin restart, `rollback.sh` |
+| 142 | D3 | `142-imagen-gigante-cves` | Imagen de 1.2 GB con CVEs | Docker-in-Docker, multi-stage, distroless `nonroot`, `.dockerignore`, trivy offline, SBOM con syft |
+
+# Planeados (sin implementar)
+
+Lista de trabajo. "(priv.)" = necesita contenedor privilegiado. Al
+implementar uno, muévelo a su pista con número de lab.
+
+## En sistema local
+
+| # | Lab | Qué practicas | Estado |
+|---|-----|---------------|--------|
+| M4a | USB del estacionamiento, Linux | usbguard con lista de permitidos, bloqueo de usb-storage, montaje noexec, auditd y journalctl | ✅ lab 138 |
+| M4b | USB del estacionamiento, Windows | Directiva de almacenamiento extraíble, lista de hardware permitido, USBSTOR, AutoRun, eventos 6416 y 4663, forense en setupapi.dev.log | ✅ lab 139 |
+
+## En contenedor: DevOps
+
+| # | Lab | Qué practicas | Estado |
+|---|-----|---------------|--------|
+| D1 | El pipeline que hoy falla | Lockfiles, caché de CI, Gitea + Woodpecker | ✅ lab 140 |
+| D2 | Rollback en menos de 2 minutos | Blue/green con nginx o HAProxy, health checks | ✅ lab 141 |
+| D3 | Imagen de 1.2 GB con CVEs | Multi-stage, distroless, usuario no root, trivy, syft | ✅ lab 142 |
+| D4 | CrashLoopBackOff (priv.) | kind/k3d, OOMKilled, probes, kubectl events | planeado |
+| D5 | Secretos en Vault | Credenciales dinámicas, gitleaks, rotación | planeado |
+| D6 | Terraform: lock y drift | plan, force-unlock, import, LocalStack o MinIO | planeado |
+| D7 | Disco lleno por logs de Docker (priv.) | Docker dentro de Docker, log-opts, docker system df | planeado |
+| D8 | Certificado que vence | step-ca, certbot, blackbox_exporter | planeado |
+| D9 | El p99 se disparó | Prometheus, Grafana, SLO, alertas por consumo del presupuesto de error | planeado |
+| D10 | Ansible no idempotente | --check --diff, handlers, Molecule | planeado |
+| D11 | ArgoCD fuera de sincronía (priv.) | GitOps, self-heal, argocd app diff | planeado |
+| D12 | NetworkPolicies (priv.) | Negar por defecto entre namespaces, Calico | planeado |
+
+## En contenedor: Mr. Robot
+
+| # | Lab | Qué practicas | Estado |
+|---|-----|---------------|--------|
+| M1 | fsociety00.dat: el DDoS como distracción | Límites de velocidad, búsqueda de persistencia, línea de tiempo | planeado |
+| M2 | Triage en el SOC de Allsafe | Wazuh o Loki, separar alertas reales del ruido | planeado |
+| M3 | La Raspberry Pi de Steel Mountain (priv.) | Inventario de red, arpwatch, segmentación OT/corporativa | planeado |
+| M5 | El CD de origen no confiable | GPG, sha256, sandbox con bubblewrap (priv.) | planeado |
+| M6 | Contraseñas adivinables | pam_pwquality, MFA en SSH | planeado |
+| M7 | Accesos que nadie revocó | Cuentas huérfanas, llaves SSH, sudoers.d | planeado |
+| M8 | Defacement de fsociety | AIDE o inotify sobre el webroot | planeado |
+| M9 | El 5/9: llaves destruidas | Respaldo 3-2-1, restic, bloqueo de objetos en MinIO | planeado |
+| M10 | Stage 2: cambios sin ticket | AIDE, etckeeper, alertas de diferencias | planeado |
+
+## En contenedor: Administración de sistemas
+
+| # | Lab | Qué practicas | Estado |
+|---|-----|---------------|--------|
+| S1 | Disco "lleno" con espacio libre | Inodos (tmpfs con pocos inodos), lsof +L1 | planeado |
+| S2 | LVM en caliente + snapshot (priv.) | Discos loop, lvextend -r, revertir el snapshot | planeado |
+| S3 | RAID degradado (priv.) | mdadm sobre discos loop | planeado |
+| S5 | Servicio systemd que no levanta (priv.) | journalctl, drop-ins, timers | planeado |
+| S6 | El OOM killer y la base de datos | Límites de memoria, cgroups, oom_score_adj | planeado |
+| S7 | Load alto sin CPU | Espera de I/O: iostat, pidstat | planeado |
+| S8 | Logs que llenan el disco | logrotate, copytruncate | planeado |
+| S9 | Respaldos que nadie probó | restic, retención, RTO/RPO | planeado |
+| S10 | Carpeta compartida de un departamento | SGID, ACLs, Samba | planeado |
+| S11 | Usuarios centralizados | OpenLDAP + SSSD | planeado |
+| S12 | Bastion SSH con CA | Certificados SSH, ProxyJump | planeado |
+| S13 | Parches sin downtime | unattended-upgrades, needrestart | planeado |
+| S14 | DNS interno lento | Unbound o BIND, ndots, dig +trace | planeado |
+| S15 | Balanceo con HAProxy | Health checks, sacar un nodo sin cortar sesiones | planeado |
+| S16 | PostgreSQL: réplica y restauración en el tiempo | Streaming replication, WAL | planeado |
+| S17 | "Too many open files" | ulimits, sysctls, TIME_WAIT | planeado |
+| S18 | Hora desfasada | chrony, libfaketime | planeado |
+| S20 | Monitoreo con runbooks | node_exporter, Alertmanager | planeado |

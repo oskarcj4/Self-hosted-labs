@@ -53,7 +53,8 @@ REAP_EVERY_S = 10
 # SOLUCION.md) se lee del disco. 'track': A = detección/respuesta, B = hardening,
 # C = 30 días de DevSecOps, D = operaciones/SRE, E = defensa anti-DDoS/DoS,
 # F = pipeline CI y runtime Docker, G = AppSec web, H = máquinas HTB,
-# I = defensa del host, J = monitoreo/SOC y redes, K = hardening web.
+# I = defensa del host, J = monitoreo/SOC y redes, K = hardening web,
+# L = guías en tu propio sistema (sin contenedor), M = DevOps: incidentes reales.
 # 'cats': categorías visibles en la tarjeta (DevSecOps,
 # DevOps, SysAdmin, Redes, Forense, Pentest, Docker). 'desc': resumen de una línea para la tarjeta.
 LABS = [
@@ -483,6 +484,25 @@ LABS = [
     ("137", "Rate limiting contra fuerza bruta", "K", 2, ["Web", "DevSecOps"],
      "Un bot machaca /api/login. Mide con hey, limita por IP con limit_req/limit_conn respondiendo 429 y comprueba el efecto en el access.log.",
      ["hey", "limit_req_zone", "limit_conn_zone", "429"]),
+
+    # --- Pista L · Guías en tu sistema (sin contenedor, bajo tu riesgo) -----
+    ("138", "USB del estacionamiento (Linux)", "L", 2, ["DevSecOps", "SysAdmin"],
+     "Guía en tu propio equipo: lista de USB permitidos con usbguard, sin usb-storage, montajes noexec y registro con auditd/journalctl.",
+     ["usbguard", "usb-storage", "noexec", "auditd", "BadUSB"]),
+    ("139", "USB del estacionamiento (Windows)", "L", 2, ["DevSecOps", "Forense"],
+     "Guía en tu propio equipo: forense con USBSTOR y setupapi.dev.log, AutoRun fuera, almacenamiento extraíble y lista de hardware, eventos 6416/4663.",
+     ["USBSTOR", "setupapi.dev.log", "DeviceInstall", "6416/4663", "AutoRun"]),
+
+    # --- Pista M · DevOps: incidentes reales --------------------------------
+    ("140", "El pipeline que hoy falla", "M", 2, ["DevOps", "DevSecOps"],
+     "Ayer pasaba, hoy falla y nadie tocó el código. Gitea + Woodpecker: fija las dependencias con un lockfile con hashes y arregla la caché de CI.",
+     ["Gitea", "Woodpecker", "lockfile", "--require-hashes", "caché de CI"]),
+    ("141", "Rollback en menos de 2 minutos", "M", 2, ["DevOps", "SRE"],
+     "La versión green rompe el checkout y HAProxy no se entera. Health check real, vuelta a blue sin reiniciar y un rollback.sh que tarde menos de 2 minutos.",
+     ["HAProxy", "blue/green", "httpchk", "runtime API", "rollback"]),
+    ("142", "Imagen de 1.2 GB con CVEs", "M", 3, ["Docker", "DevSecOps"],
+     "La imagen de la API pesa más de un giga y trivy la llena de CVEs. Multi-stage, distroless, usuario no root, escaneo con trivy y SBOM con syft.",
+     ["multi-stage", "distroless", "non-root", "trivy", "syft"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
@@ -514,6 +534,10 @@ LAB_CURSOS = {
     "129": ["10"], "130": ["10"], "131": ["10"], "132": ["10"],
     # Pista K · hardening web
     "133": ["12"], "134": ["13"], "135": ["13"], "137": ["14", "11"],
+    # Pista L · guías en tu sistema
+    "138": ["04", "08", "09"], "139": ["09"],
+    # Pista M · DevOps
+    "140": ["13"], "142": ["13"],
 }
 ID_RE = re.compile(r"^\d{2,3}$")
 
@@ -816,6 +840,9 @@ def labs_payload():
             "skills": skills,
             "cursos": LAB_CURSOS.get(lab_id, []),
             "exists": lab_dir(lab_id) is not None,
+            # Guía sin contenedor: se aplica en el sistema del alumno.
+            "local": lab_dir(lab_id) is not None and compose_file(lab_id) is None,
+            "dir": os.path.basename(lab_dir(lab_id) or ""),
             "running": lab_id in running,
             "ttydPort": TTYD_BASE + int(lab_id),
             "redCapable": red_capable(lab_id),
@@ -926,6 +953,9 @@ class Handler(BaseHTTPRequestHandler):
         lab_id, action = m.group(1), m.group(2)
         if lab_dir(lab_id) is None:
             return self._json({"error": "lab inexistente"}, 404)
+        if compose_file(lab_id) is None:
+            return self._json({"error": "Esta guía no tiene contenedor: se "
+                               "aplica en tu propio sistema."}, 400)
 
         qs = url.query.split("&")
         want_red = "mode=red" in qs and red_capable(lab_id)

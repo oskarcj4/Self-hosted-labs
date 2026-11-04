@@ -216,6 +216,29 @@ que comprueba el arreglo).
 |---|---|---|
 | 102 | Saltar / blindar un firewall | iptables mal configurado (puerto de origen, orden de reglas) |
 
+### 🔌 Pista L — Guías en tu propio sistema (138–139)
+
+> ⚠️ **Sin contenedor.** Estas guías endurecen las políticas de dispositivos
+> externos de **tu** equipo, y se aplican **bajo tu propio riesgo**. Mejor en
+> una máquina virtual con snapshot. Cada una trae "Deshacer todo" y un
+> script `verificar.*` que sólo lee la configuración.
+
+| # | Guía | Clave |
+|---|---|---|
+| 138 | USB del estacionamiento (Linux) | usbguard, `usb-storage` fuera, `noexec`, auditd |
+| 139 | USB del estacionamiento (Windows) | USBSTOR, `setupapi.dev.log`, AutoRun, lista de hardware, eventos 6416/4663 |
+
+### ⚙️ Pista M — DevOps: incidentes reales (140–142)
+
+| # | Lab | Clave |
+|---|---|---|
+| 140 | El pipeline que hoy falla | Gitea + Woodpecker, lockfile con hashes, clave de caché |
+| 141 | Rollback en menos de 2 minutos | HAProxy blue/green, health check real, runtime API |
+| 142 | Imagen de 1.2 GB con CVEs | multi-stage, distroless, no root, trivy, syft |
+
+Los labs planeados (D4–D12, Mr. Robot M1–M10, administración S1–S20) están
+en [`CATALOGO.md`](CATALOGO.md#planeados-sin-implementar).
+
 ### 📚 Teoría de apoyo
 
 En [`cursos/`](cursos/) hay 14 módulos (00–13) que cubren los labs 01–23:
