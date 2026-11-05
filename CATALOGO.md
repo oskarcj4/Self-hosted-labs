@@ -194,3 +194,227 @@ blue (acceso total + validador del arreglo). Mismo compose para ambos modos.
 | 106 | `106-traversal-y-autorizacion` | Visor con path traversal + autz rota | ruta sin saneo + `/admin` confía en cabecera · OWASP A01 |
 | 109 | `109-firewall-ssh-interno` | Saltar / blindar un firewall hasta el SSH | iptables: política por defecto `ACCEPT` + regla de SSH en protocolo equivocado |
 | 110 | `110-firewall-panel-sin-parchear` | Cruzar / parchear un firewall por un panel sin actualizar | firewall correcto, pero Webmin 1.920 expuesto · CVE-2019-15107 (RCE) · fix = actualizar |
+
+# Pista L — Guías en tu sistema (labs 138+)
+
+Guías **sin contenedor**: se aplican en tu propio equipo (Linux o Windows) y
+**bajo tu propio riesgo**, porque endurecen las políticas de dispositivos
+externos de la máquina real. Recomendado: máquina virtual con snapshot. Cada
+guía trae su sección "Deshacer todo" y un script `verificar.*` que sólo lee la
+configuración. En la web no tienen botón de iniciar ni terminal.
+
+| Lab | Plan | Carpeta | Tema | Clave |
+|-----|------|---------|------|-------|
+| 138 | M4a | `138-usb-estacionamiento-linux` | USB del estacionamiento, Linux | usbguard (lista de permitidos, anti-BadUSB), `usb-storage`/`uas` fuera, udisks2 `noexec`, auditd + journalctl |
+| 139 | M4b | `139-usb-estacionamiento-windows` | USB del estacionamiento, Windows | forense USBSTOR + `setupapi.dev.log`, AutoRun, `RemovableStorageDevices`, `DeviceInstall\Restrictions`, eventos 6416/4663 |
+
+# Pista M — DevOps: incidentes reales (labs 140+)
+
+| Lab | Plan | Carpeta | Tema | Clave |
+|-----|------|---------|------|-------|
+| 140 | D1 | `140-pipeline-que-hoy-falla` | El pipeline que hoy falla | Gitea + Woodpecker (backend local), lockfile con `--require-hashes`, clave de caché por hash del lockfile |
+| 141 | D2 | `141-rollback-blue-green` | Rollback en menos de 2 minutos | HAProxy blue/green, `httpchk /health`, runtime API (`level admin`), reload sin restart, `rollback.sh` |
+| 142 | D3 | `142-imagen-gigante-cves` | Imagen de 1.2 GB con CVEs | Docker-in-Docker, multi-stage, distroless `nonroot`, `.dockerignore`, trivy offline, SBOM con syft |
+
+# Planeados (sin implementar)
+
+Lista de trabajo. "(priv.)" = necesita contenedor privilegiado. Al
+implementar uno, muévelo a su pista con número de lab.
+
+## En sistema local
+
+| # | Lab | Qué practicas | Estado |
+|---|-----|---------------|--------|
+| M4a | USB del estacionamiento, Linux | usbguard con lista de permitidos, bloqueo de usb-storage, montaje noexec, auditd y journalctl | ✅ lab 138 |
+| M4b | USB del estacionamiento, Windows | Directiva de almacenamiento extraíble, lista de hardware permitido, USBSTOR, AutoRun, eventos 6416 y 4663, forense en setupapi.dev.log | ✅ lab 139 |
+
+## En contenedor: DevOps
+
+| # | Lab | Qué practicas | Estado |
+|---|-----|---------------|--------|
+| D1 | El pipeline que hoy falla | Lockfiles, caché de CI, Gitea + Woodpecker | ✅ lab 140 |
+| D2 | Rollback en menos de 2 minutos | Blue/green con nginx o HAProxy, health checks | ✅ lab 141 |
+| D3 | Imagen de 1.2 GB con CVEs | Multi-stage, distroless, usuario no root, trivy, syft | ✅ lab 142 |
+| D4 | CrashLoopBackOff (priv.) | kind/k3d, OOMKilled, probes, kubectl events | planeado |
+| D5 | Secretos en Vault | Credenciales dinámicas, gitleaks, rotación | planeado |
+| D6 | Terraform: lock y drift | plan, force-unlock, import, LocalStack o MinIO | planeado |
+| D7 | Disco lleno por logs de Docker (priv.) | Docker dentro de Docker, log-opts, docker system df | planeado |
+| D8 | Certificado que vence | step-ca, certbot, blackbox_exporter | planeado |
+| D9 | El p99 se disparó | Prometheus, Grafana, SLO, alertas por consumo del presupuesto de error | planeado |
+| D10 | Ansible no idempotente | --check --diff, handlers, Molecule | planeado |
+| D11 | ArgoCD fuera de sincronía (priv.) | GitOps, self-heal, argocd app diff | planeado |
+| D12 | NetworkPolicies (priv.) | Negar por defecto entre namespaces, Calico | planeado |
+
+## En contenedor: Mr. Robot
+
+| # | Lab | Qué practicas | Estado |
+|---|-----|---------------|--------|
+| M1 | fsociety00.dat: el DDoS como distracción | Límites de velocidad, búsqueda de persistencia, línea de tiempo | ✅ lab 143 |
+| M2 | Triage en el SOC de Allsafe | Separar alertas reales del ruido, identificar al atacante, suprimir regla ruidosa | ✅ lab 144 |
+| M3 | La Raspberry Pi de Steel Mountain (priv.) | Inventario de red, OUI, nftables, segmentación OT/corporativa | ✅ lab 145 |
+| M5 | El CD de origen no confiable | GPG, sha256, sandbox con bubblewrap (priv.) | ✅ lab 146 |
+| M6 | Contraseñas adivinables | pam_pwquality, MFA en SSH con TOTP | ✅ lab 147 |
+| M7 | Accesos que nadie revocó | Cuentas huérfanas, llaves SSH, sudoers.d | ✅ lab 148 |
+| M8 | Defacement de fsociety | AIDE e inotify sobre el webroot | ✅ lab 149 |
+| M9 | El 5/9: llaves destruidas | Respaldo 3-2-1, restic, copia inmutable (chattr +i) | ✅ lab 150 |
+| M10 | Stage 2: cambios sin ticket | etckeeper (git en /etc), revertir a la base, auditoría | ✅ lab 151 |
+
+## En contenedor: Administración de sistemas
+
+| # | Lab | Qué practicas | Estado |
+|---|-----|---------------|--------|
+| S1 | Disco "lleno" con espacio libre | Inodos (tmpfs con pocos inodos), lsof +L1 | planeado |
+| S2 | LVM en caliente + snapshot (priv.) | Discos loop, lvextend -r, revertir el snapshot | planeado |
+| S3 | RAID degradado (priv.) | mdadm sobre discos loop | planeado |
+| S5 | Servicio systemd que no levanta (priv.) | journalctl, drop-ins, timers | planeado |
+| S6 | El OOM killer y la base de datos | Límites de memoria, cgroups, oom_score_adj | planeado |
+| S7 | Load alto sin CPU | Espera de I/O: iostat, pidstat | planeado |
+| S8 | Logs que llenan el disco | logrotate, copytruncate | planeado |
+| S9 | Respaldos que nadie probó | restic, retención, RTO/RPO | planeado |
+| S10 | Carpeta compartida de un departamento | SGID, ACLs, Samba | planeado |
+| S11 | Usuarios centralizados | OpenLDAP + SSSD | planeado |
+| S12 | Bastion SSH con CA | Certificados SSH, ProxyJump | planeado |
+| S13 | Parches sin downtime | unattended-upgrades, needrestart | planeado |
+| S14 | DNS interno lento | Unbound o BIND, ndots, dig +trace | planeado |
+| S15 | Balanceo con HAProxy | Health checks, sacar un nodo sin cortar sesiones | planeado |
+| S16 | PostgreSQL: réplica y restauración en el tiempo | Streaming replication, WAL | planeado |
+| S17 | "Too many open files" | ulimits, sysctls, TIME_WAIT | planeado |
+| S18 | Hora desfasada | chrony, libfaketime | planeado |
+| S20 | Monitoreo con runbooks | node_exporter, Alertmanager | planeado |
+
+## Hoja de ruta ampliada — Cloud native / DevOps / SRE
+
+Temario de producción propuesto para nuevas pistas. Todo en estado
+**planeado** salvo lo que ya esté implementado (se enlaza su lab).
+Prioridad del autor: **★** prioritario (recomendado empezar por ahí) ·
+**▲** avanzado o dependiente del entorno (p. ej. kernel de Docker Desktop).
+
+### Imagen y ejecución en producción
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ★ | Dockerfile de producción | Multi-stage, usuario no root, imagen mínima y metadatos | planeado |
+| ★ | Configuración por ambiente | Misma imagen en dev, staging y prod, solo con variables distintas | planeado |
+| ★ | Tres health checks | startup, liveness y readiness, con dependencias reales | planeado |
+|  | Apagado limpio | Manejar SIGTERM y PID 1, y terminar las peticiones en curso | planeado |
+| ★ | Migraciones sin downtime | Flyway o Alembic con el patrón expand/contract | planeado |
+|  | Versionado y releases | SemVer, changelog automático y despliegue por digest | planeado |
+|  | Compose para un VPS | Proxy, HTTPS, reinicios, límites y volúmenes persistentes | planeado |
+|  | Imágenes multiarquitectura | buildx para amd64 y arm64, y caché de BuildKit | planeado |
+|  | Logs para producción | JSON, ID de petición y sin datos sensibles | planeado |
+| ★ | Revisión antes de salir | Comprobar seguridad, backups, alertas, runbook y rollback | planeado |
+
+### CI/CD
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ★ | Pipeline completo | Pruebas, build, escaneo, publicación, despliegue y rollback | planeado |
+| ★ | El pipeline que ayer pasaba | Dependencias sin fijar y caché engañosa | ✅ lab 140 |
+|  | Pruebas inestables | Detectar, aislar y medir pruebas que fallan al azar | planeado |
+|  | Pipeline lento | Bajar de 20 a 5 minutos con caché y ejecución en paralelo | planeado |
+| ★ | Monorepo | Construir y desplegar solo lo que cambió | planeado |
+|  | Runners propios | Gitea Actions o Woodpecker, aislados y sin secretos expuestos | planeado |
+| ▲ | Plantillas reutilizables | Un pipeline estándar para todos los servicios | planeado |
+|  | Ambientes de vista previa | Uno por pull request, destruido al cerrarlo | planeado |
+| ▲ | Actualizaciones automáticas | Renovate, con pruebas y merge controlado | planeado |
+
+### Estrategias de despliegue
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ★ | Rollback en menos de 2 minutos | blue/green con health checks | ✅ lab 141 |
+| ▲ | Canary con Argo Rollouts | Subir tráfico por etapas y revertir según métricas | planeado |
+|  | Feature flags | OpenFeature para separar desplegar de activar | planeado |
+|  | Rollback con cambio de base de datos | El caso en que volver atrás no es tan simple | planeado |
+
+### Kubernetes
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ★ | CrashLoopBackOff | OOMKilled, probes malas y ConfigMaps faltantes | planeado |
+| ★ | Pods en Pending | Recursos, afinidad, taints y volúmenes | planeado |
+| ★ | Requests y límites | Clases de QoS y estrangulamiento de CPU | planeado |
+|  | Service sin tráfico | selectors, endpoints, DNS y puertos | planeado |
+| ▲ | De Ingress a Gateway API | Ingress NGINX se retiró en marzo de 2026 y ya no recibe parches | planeado |
+|  | cert-manager | Certificados automáticos con una CA local | planeado |
+| ★ | Helm | Chart propio, valores por ambiente, upgrade y rollback | planeado |
+|  | Kustomize | Bases y overlays, y cuándo elegirlo sobre Helm | planeado |
+|  | StatefulSets | PostgreSQL con volúmenes persistentes y reinicios seguros | planeado |
+|  | RBAC | Permisos mínimos y auditoría de cuentas de servicio | planeado |
+| ★ | NetworkPolicies | Negar por defecto y permitir solo lo necesario | planeado |
+| ★ | Escalado | HPA con carga real y KEDA según colas | planeado |
+|  | Mantenimiento de nodos | drain, PodDisruptionBudget y sin cortes | planeado |
+|  | Jobs y CronJobs | Reintentos, concurrencia y tareas atascadas | planeado |
+|  | Actualizar versión de Kubernetes | APIs obsoletas y plan de actualización en kind | planeado |
+
+### GitOps
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ★ | Argo CD fuera de sincronía | drift, self-heal y app diff | planeado |
+| ▲ | Promoción entre ambientes | dev, staging y prod mediante pull requests | planeado |
+|  | App of Apps | Administrar muchos servicios desde un solo repo | planeado |
+| ▲ | Secretos en GitOps | External Secrets o SOPS, sin nada legible en Git | planeado |
+
+### Infraestructura como código
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ★ | Terraform: lock y drift | plan, force-unlock e import | planeado |
+| ★ | Módulos reutilizables | Versiones, variables y salidas | planeado |
+|  | Estado remoto | Backend en MinIO y separación por ambiente | planeado |
+|  | Pruebas de infraestructura | terraform test, tflint y Checkov en el pipeline | planeado |
+| ▲ | OpenTofu | Migrar un proyecto y comparar el resultado | planeado |
+|  | Ansible | Roles idempotentes, --check --diff y Molecule | planeado |
+
+### Observabilidad
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ▲★ | OpenTelemetry | Métricas, logs y trazas de una app con Collector | planeado |
+| ★ | Métricas RED | Prometheus y Grafana por servicio | planeado |
+|  | Logs con Loki | Búsquedas y correlación por ID de petición | planeado |
+| ▲ | Trazas con Tempo | Encontrar qué servicio causa la lentitud | planeado |
+| ★ | SLO y presupuesto de error | Alertas por consumo, no por CPU | planeado |
+|  | Alertas con ruido | Dejar solo las accionables, con su runbook | planeado |
+| ★ | Verde, pero fallando | Pool agotado, CPU estrangulada y DNS lento | planeado |
+| ▲ | eBPF | Ver tráfico y procesos con Cilium o Pixie (depende del kernel de Docker Desktop) | planeado |
+
+### Seguridad y cadena de suministro
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ★ | Escaneo en el pipeline | Trivy y Semgrep, con reglas para bloquear | planeado |
+| ▲ | SBOM | Generar con Syft y revisar qué afecta un CVE nuevo | planeado |
+| ▲ | Firmar imágenes | cosign, y rechazar las que no estén firmadas | planeado |
+| ▲ | Política como código | Kyverno u OPA para bloquear despliegues inseguros | planeado |
+| ★ | Vault | Credenciales dinámicas, rotación y gitleaks | planeado |
+|  | Detección en ejecución | Falco alerta si alguien abre una shell en un pod (depende del kernel) | planeado |
+
+### Confiabilidad e incidentes
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ★ | Backup y restauración de PostgreSQL | A un punto exacto, midiendo RTO y RPO | planeado |
+|  | Backup de Kubernetes | Velero con almacenamiento en MinIO | planeado |
+| ▲ | Caos controlado | Toxiproxy o Chaos Mesh para latencia y caídas | planeado |
+| ★ | Pruebas de carga | k6 para encontrar el primer cuello de botella | planeado |
+| ★ | Incidente completo | Diagnóstico, comunicación, arreglo y postmortem | planeado |
+
+### Plataforma y automatización
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ▲★ | Portal Backstage | Catálogo de servicios y documentación | planeado |
+| ▲ | Camino estándar | Una plantilla crea repo, pipeline, chart y monitoreo | planeado |
+| ★ | Automatizar con Python y Bash | Limpieza, reportes y API de Kubernetes | planeado |
+|  | Costos con OpenCost | Estimar el gasto por equipo y ajustar recursos | planeado |
+
+### IA en producción
+
+| Prioridad | Lab | Qué practicas | Estado |
+|-----------|-----|---------------|--------|
+| ▲ | Servir un modelo | Ollama con FastAPI, colas, límites y métricas | planeado |
+| ▲ | RAG en producción | pgvector, despliegue, evaluación y rollback | planeado |
+| ▲ | Observabilidad de LLM | Latencia, tokens, costo y calidad con Phoenix | planeado |
+| ▲ | Agente con permisos mínimos | Analiza fallas de CI y propone un PR, pero no despliega solo | planeado |

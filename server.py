@@ -53,7 +53,10 @@ REAP_EVERY_S = 10
 # SOLUCION.md) se lee del disco. 'track': A = detección/respuesta, B = hardening,
 # C = 30 días de DevSecOps, D = operaciones/SRE, E = defensa anti-DDoS/DoS,
 # F = pipeline CI y runtime Docker, G = AppSec web, H = máquinas HTB,
-# I = defensa del host, J = monitoreo/SOC y redes, K = hardening web.
+# I = defensa del host, J = monitoreo/SOC y redes, K = hardening web,
+# L = guías en tu propio sistema (sin contenedor), M = DevOps: incidentes reales,
+# N = Mr. Robot: defensa azul inspirada en la serie,
+# O = DevOps/Cloud native moderno y almacenamiento.
 # 'cats': categorías visibles en la tarjeta (DevSecOps,
 # DevOps, SysAdmin, Redes, Forense, Pentest, Docker). 'desc': resumen de una línea para la tarjeta.
 LABS = [
@@ -483,6 +486,77 @@ LABS = [
     ("137", "Rate limiting contra fuerza bruta", "K", 2, ["Web", "DevSecOps"],
      "Un bot machaca /api/login. Mide con hey, limita por IP con limit_req/limit_conn respondiendo 429 y comprueba el efecto en el access.log.",
      ["hey", "limit_req_zone", "limit_conn_zone", "429"]),
+
+    # --- Pista L · Guías en tu sistema (sin contenedor, bajo tu riesgo) -----
+    ("138", "USB del estacionamiento (Linux)", "L", 2, ["DevSecOps", "SysAdmin"],
+     "Guía en tu propio equipo: lista de USB permitidos con usbguard, sin usb-storage, montajes noexec y registro con auditd/journalctl.",
+     ["usbguard", "usb-storage", "noexec", "auditd", "BadUSB"]),
+    ("139", "USB del estacionamiento (Windows)", "L", 2, ["DevSecOps", "Forense"],
+     "Guía en tu propio equipo: forense con USBSTOR y setupapi.dev.log, AutoRun fuera, almacenamiento extraíble y lista de hardware, eventos 6416/4663.",
+     ["USBSTOR", "setupapi.dev.log", "DeviceInstall", "6416/4663", "AutoRun"]),
+
+    # --- Pista M · DevOps: incidentes reales --------------------------------
+    ("140", "El pipeline que hoy falla", "M", 2, ["DevOps", "DevSecOps"],
+     "Ayer pasaba, hoy falla y nadie tocó el código. Gitea + Woodpecker: fija las dependencias con un lockfile con hashes y arregla la caché de CI.",
+     ["Gitea", "Woodpecker", "lockfile", "--require-hashes", "caché de CI"]),
+    ("141", "Rollback en menos de 2 minutos", "M", 2, ["DevOps", "SRE"],
+     "La versión green rompe el checkout y HAProxy no se entera. Health check real, vuelta a blue sin reiniciar y un rollback.sh que tarde menos de 2 minutos.",
+     ["HAProxy", "blue/green", "httpchk", "runtime API", "rollback"]),
+    ("142", "Imagen de 1.2 GB con CVEs", "M", 3, ["Docker", "DevSecOps"],
+     "La imagen de la API pesa más de un giga y trivy la llena de CVEs. Multi-stage, distroless, usuario no root, escaneo con trivy y SBOM con syft.",
+     ["multi-stage", "distroless", "non-root", "trivy", "syft"]),
+
+    # --- Pista N · Mr. Robot: defensa azul -----------------------------------
+    ("143", "fsociety: el DDoS como distracción", "N", 3, ["DevSecOps", "Redes"],
+     "El flood a allsafe es la tapadera: mientras nginx se ahoga, fsociety deja persistencia. Rate-limit, caza del cron/beacon y timeline del incidente.",
+     ["nginx", "limit_req", "429", "cron.d", "timeline"]),
+    ("144", "Triage en el SOC de Allsafe", "N", 2, ["DevSecOps", "Forense"],
+     "31 alertas de ruido y 3 reales en el mismo JSONL. Separa la señal, identifica al atacante y suprime la regla ruidosa sin perder lo importante.",
+     ["SOC", "triage", "jsonl", "falsos positivos", "supresión"]),
+    ("145", "La Raspberry Pi de Steel Mountain", "N", 3, ["Redes", "DevSecOps"],
+     "Un dispositivo no inventariado apareció en la red climática. Identifícalo por su OUI, bloquéalo con nftables y deja la regla persistente.",
+     ["inventario", "OUI", "nftables", "ping sweep", "ip neigh"]),
+    ("146", "El CD de origen no confiable", "N", 3, ["DevSecOps", "Forense"],
+     "El instalador entregado no coincide con el del mirror firmado. Verifica firma GPG y SHA256, y ejecútalo aislado sin red con bubblewrap.",
+     ["GPG", "SHA256SUMS", "bubblewrap", "--unshare-net", "cadena de suministro"]),
+    ("147", "Contraseñas adivinables", "N", 2, ["DevSecOps", "SysAdmin"],
+     "Cuentas de Allsafe con contraseñas débiles. Aplica política con pam_pwquality, exige MFA por SSH con TOTP y bloquea las cuentas comprometidas.",
+     ["pam_pwquality", "minlen", "MFA", "TOTP", "passwd -l"]),
+    ("148", "Accesos que nadie revocó", "N", 2, ["DevSecOps", "SysAdmin"],
+     "Quedan cuentas y llaves de gente que ya no está, y una llave de dark army. Cruza altas/bajas, revoca huérfanos y quita la llave no aprobada.",
+     ["IAM", "joiner-mover-leaver", "authorized_keys", "sudoers.d", "revocación"]),
+    ("149", "Defacement de fsociety", "N", 2, ["DevSecOps", "Forense"],
+     "fsociety cambió la portada del sitio. Restaura desde copia, levanta integridad con AIDE y vigilancia en vivo con inotify sobre /var/www.",
+     ["defacement", "AIDE", "FIM", "inotify", "integridad"]),
+    ("150", "El 5/9: llaves destruidas", "N", 3, ["DevSecOps", "SRE"],
+     "Un ransomware vació /srv/datos. Restaura con restic desde la copia de anoche y crea una copia inmutable fuera de sitio (3-2-1) para la próxima.",
+     ["restic", "3-2-1", "inmutabilidad", "chattr +i", "ransomware"]),
+    ("151", "Stage 2: cambios sin ticket", "N", 3, ["DevSecOps", "SysAdmin"],
+     "Cambios en /etc sin ticket de cambio: root por SSH y un cron oculto. Con etckeeper (git en /etc) detéctalos, revierte a la base y documenta.",
+     ["etckeeper", "git", "gestión del cambio", "sshd_config", "auditoría"]),
+
+    # --- Pista O · DevOps/Cloud native moderno y almacenamiento --------------
+    ("152", "Dockerfile de producción", "O", 3, ["Docker", "DevOps"],
+     "La API usa una imagen gorda y corre como root. Hazla de producción: multi-stage, base ligera, usuario no root, HEALTHCHECK, labels OCI y .dockerignore.",
+     ["multi-stage", "non-root", "HEALTHCHECK", "OCI labels", ".dockerignore"]),
+    ("153", "Configuración por ambiente", "O", 2, ["DevOps", "DevSecOps"],
+     "Config y un secreto quemados en el código. Hazla 12-factor: todo por variables de entorno, secreto fuera del código y EnvironmentFile en el servicio.",
+     ["12-factor", "os.environ", "EnvironmentFile", "secretos", "systemd"]),
+    ("154", "Tres health checks", "O", 3, ["DevOps", "SRE"],
+     "Una sola sonda que siempre dice 200, aunque la base de datos esté caída. Implementa liveness, readiness y startup con semántica real y dependencias.",
+     ["liveness", "readiness", "startup", "probes", "503"]),
+    ("155", "Montar un disco", "O", 2, ["SysAdmin"],
+     "Llega un disco nuevo sin formato. Reconócelo como dispositivo de bloque, formatéalo en ext4, móntalo y déjalo persistente en /etc/fstab.",
+     ["losetup", "mkfs.ext4", "mount", "fstab", "lsblk"]),
+    ("156", "Disco cifrado con LUKS", "O", 3, ["SysAdmin", "DevSecOps"],
+     "Datos sensibles cifrados en reposo. Cifra un disco con cryptsetup luksFormat (LUKS2), ábrelo, formatea el mapper, móntalo y escribe los datos.",
+     ["cryptsetup", "luksFormat", "LUKS2", "dm-crypt", "cifrado en reposo"]),
+    ("157", "Migraciones sin downtime", "O", 3, ["DevOps", "SRE"],
+     "Renombrar una columna sin romper la app durante el despliegue. Patrón expand/contract con Alembic: añade y copia, despliega, y solo después elimina.",
+     ["Alembic", "expand/contract", "migraciones", "SQLite", "batch_alter_table"]),
+    ("158", "Revisión antes de salir", "O", 2, ["DevOps", "SRE"],
+     "Checklist de go-live: servicio sin root, secreto 600, backups con timer, runbook y rollback. Cierra los huecos y firma el checklist.",
+     ["go-live", "runbook", "rollback", "backups", "checklist"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
@@ -514,6 +588,10 @@ LAB_CURSOS = {
     "129": ["10"], "130": ["10"], "131": ["10"], "132": ["10"],
     # Pista K · hardening web
     "133": ["12"], "134": ["13"], "135": ["13"], "137": ["14", "11"],
+    # Pista L · guías en tu sistema
+    "138": ["04", "08", "09"], "139": ["09"],
+    # Pista M · DevOps
+    "140": ["13"], "142": ["13"],
 }
 ID_RE = re.compile(r"^\d{2,3}$")
 
@@ -816,6 +894,9 @@ def labs_payload():
             "skills": skills,
             "cursos": LAB_CURSOS.get(lab_id, []),
             "exists": lab_dir(lab_id) is not None,
+            # Guía sin contenedor: se aplica en el sistema del alumno.
+            "local": lab_dir(lab_id) is not None and compose_file(lab_id) is None,
+            "dir": os.path.basename(lab_dir(lab_id) or ""),
             "running": lab_id in running,
             "ttydPort": TTYD_BASE + int(lab_id),
             "redCapable": red_capable(lab_id),
@@ -926,6 +1007,9 @@ class Handler(BaseHTTPRequestHandler):
         lab_id, action = m.group(1), m.group(2)
         if lab_dir(lab_id) is None:
             return self._json({"error": "lab inexistente"}, 404)
+        if compose_file(lab_id) is None:
+            return self._json({"error": "Esta guía no tiene contenedor: se "
+                               "aplica en tu propio sistema."}, 400)
 
         qs = url.query.split("&")
         want_red = "mode=red" in qs and red_capable(lab_id)

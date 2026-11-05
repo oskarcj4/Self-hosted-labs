@@ -216,6 +216,43 @@ que comprueba el arreglo).
 |---|---|---|
 | 102 | Saltar / blindar un firewall | iptables mal configurado (puerto de origen, orden de reglas) |
 
+### 🔌 Pista L — Guías en tu propio sistema (138–139)
+
+> ⚠️ **Sin contenedor.** Estas guías endurecen las políticas de dispositivos
+> externos de **tu** equipo, y se aplican **bajo tu propio riesgo**. Mejor en
+> una máquina virtual con snapshot. Cada una trae "Deshacer todo" y un
+> script `verificar.*` que sólo lee la configuración.
+
+| # | Guía | Clave |
+|---|---|---|
+| 138 | USB del estacionamiento (Linux) | usbguard, `usb-storage` fuera, `noexec`, auditd |
+| 139 | USB del estacionamiento (Windows) | USBSTOR, `setupapi.dev.log`, AutoRun, lista de hardware, eventos 6416/4663 |
+
+### ⚙️ Pista M — DevOps: incidentes reales (140–142)
+
+| # | Lab | Clave |
+|---|---|---|
+| 140 | El pipeline que hoy falla | Gitea + Woodpecker, lockfile con hashes, clave de caché |
+| 141 | Rollback en menos de 2 minutos | HAProxy blue/green, health check real, runtime API |
+| 142 | Imagen de 1.2 GB con CVEs | multi-stage, distroless, no root, trivy, syft |
+
+### 🎭 Pista N — Mr. Robot: defensa azul (143–151)
+
+| # | Lab | Clave |
+|---|---|---|
+| 143 | fsociety: el DDoS como distracción | nginx `limit_req`, 429, caza de `cron.d`/beacon, timeline |
+| 144 | Triage en el SOC de Allsafe | separar señal del ruido, atacante, supresión de regla |
+| 145 | La Raspberry Pi de Steel Mountain | inventario de red, OUI, nftables persistente |
+| 146 | El CD de origen no confiable | GPG, SHA256SUMS, bubblewrap `--unshare-net` |
+| 147 | Contraseñas adivinables | pam_pwquality, MFA SSH con TOTP, `passwd -l` |
+| 148 | Accesos que nadie revocó | altas/bajas, authorized_keys, sudoers.d |
+| 149 | Defacement de fsociety | AIDE, inotify (FIM) sobre `/var/www` |
+| 150 | El 5/9: llaves destruidas | restic, 3-2-1, copia inmutable `chattr +i` |
+| 151 | Stage 2: cambios sin ticket | etckeeper (git en `/etc`), revertir a la base |
+
+Los labs planeados (D4–D12, administración S1–S20) están
+en [`CATALOGO.md`](CATALOGO.md#planeados-sin-implementar).
+
 ### 📚 Teoría de apoyo
 
 En [`cursos/`](cursos/) hay 14 módulos (00–13) que cubren los labs 01–23:
