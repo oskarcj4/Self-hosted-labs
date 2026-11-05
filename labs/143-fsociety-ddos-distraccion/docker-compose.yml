@@ -1,0 +1,29 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-143
+    hostname: allsafe-143
+    privileged: true      # systemd real dentro del contenedor
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      red: {ipv4_address: 10.143.0.10}
+    ports:
+      - "127.0.0.1:7743:7681"   # terminal web (ttyd)
+
+  # La "distracción": inundación HTTP contra la raíz (~25 peticiones/s).
+  bot:
+    image: alpine:3.20
+    container_name: tc-lab-143-bot
+    hostname: fsociety
+    command: ["sh", "-c", "while :; do wget -q -O /dev/null http://10.143.0.10/ 2>/dev/null; usleep 40000; done"]
+    networks:
+      red: {ipv4_address: 10.143.0.66}
+
+networks:
+  red:
+    ipam: {config: [{subnet: 10.143.0.0/24}]}

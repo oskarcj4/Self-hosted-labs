@@ -1,0 +1,19 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-150
+    hostname: ecorp-150
+    privileged: true      # systemd real + chattr sobre volumen ext4
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    volumes:
+      - offsite:/srv/offsite   # volumen ext4: soporta chattr +i (inmutabilidad)
+    ports:
+      - "127.0.0.1:7750:7681"   # terminal web (ttyd)
+
+volumes:
+  offsite:

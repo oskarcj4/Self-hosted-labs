@@ -1,0 +1,48 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-145
+    hostname: estacion-145
+    privileged: true      # systemd real + nftables
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    networks:
+      red: {ipv4_address: 10.145.0.10}
+    ports:
+      - "127.0.0.1:7745:7681"   # terminal web (ttyd)
+
+  # Servidor corporativo legítimo.
+  corp:
+    image: alpine:3.20
+    container_name: tc-lab-145-corp
+    hostname: corp-srv
+    command: ["sh", "-c", "while :; do sleep 30; done"]
+    networks:
+      red: {ipv4_address: 10.145.0.20}
+
+  # Controlador OT/HVAC legítimo (Steel Mountain).
+  hvac:
+    image: alpine:3.20
+    container_name: tc-lab-145-hvac
+    hostname: hvac-ctrl
+    command: ["sh", "-c", "while :; do sleep 30; done"]
+    networks:
+      red: {ipv4_address: 10.145.0.50}
+
+  # El dispositivo que NO debería estar: Raspberry Pi (OUI b8:27:eb) planteada.
+  pi:
+    image: alpine:3.20
+    container_name: tc-lab-145-pi
+    hostname: raspberrypi
+    mac_address: "b8:27:eb:59:05:09"
+    command: ["sh", "-c", "while :; do ping -c1 -W1 10.145.0.50 >/dev/null 2>&1; sleep 3; done"]
+    networks:
+      red: {ipv4_address: 10.145.0.66}
+
+networks:
+  red:
+    ipam: {config: [{subnet: 10.145.0.0/24}]}
