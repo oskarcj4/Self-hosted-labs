@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# ci-run [repo] — ejecuta ci/pipeline.sh del repo (por defecto ~/monorepo) sobre
+# su commit HEAD, como lo haría el CI en un push: CI_BASE = commit anterior
+# (HEAD~1), CI_HEAD = HEAD. Muestra la duración total.
+set -u
+REPO=$(cd "${1:-/home/analista/monorepo}" && pwd) || exit 2
+HEAD=$(git -C "$REPO" rev-parse HEAD) || exit 2
+BASE=$(git -C "$REPO" rev-parse HEAD~1 2>/dev/null || git hash-object -t tree /dev/null)
+T=$(mktemp -d)
+git clone -q "$REPO" "$T" && git -C "$T" checkout -q "$HEAD"
+echo "== CI · ${BASE:0:8}..${HEAD:0:8} · $(date '+%F %T')"
+t0=$(date +%s)
+(cd "$T" && CI_BASE="$BASE" CI_HEAD="$HEAD" bash ci/pipeline.sh); rc=$?
+echo "== Duración: $(( $(date +%s) - t0 )) s · resultado: $([ $rc = 0 ] && echo success || echo failure)"
+rm -rf "$T"
+exit $rc

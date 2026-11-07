@@ -557,6 +557,111 @@ LABS = [
     ("158", "Revisión antes de salir", "O", 2, ["DevOps", "SRE"],
      "Checklist de go-live: servicio sin root, secreto 600, backups con timer, runbook y rollback. Cierra los huecos y firma el checklist.",
      ["go-live", "runbook", "rollback", "backups", "checklist"]),
+    ("159", "Pipeline completo", "O", 3, ["DevOps", "DevSecOps"],
+     "El pipeline sólo hace build latest y deploy. Añade pruebas, gitleaks, imagen por commit en un registro, y deploy con health check y rollback automático.",
+     ["Woodpecker", "gitleaks", "registry", "tag por SHA", "rollback"]),
+    ("160", "Monorepo: sólo lo que cambió", "O", 2, ["DevOps"],
+     "Cada push reconstruye los tres servicios del monorepo. Calcula los afectados con git diff y su grafo de dependencias y construye sólo esos.",
+     ["monorepo", "git diff", "dependencias", "builds selectivos", "CI"]),
+    ("161", "CrashLoopBackOff", "O", 2, ["Kubernetes", "SRE"],
+     "Tres pods reinician sin parar en k3s. Diagnostica OOMKilled, una livenessProbe mal apuntada y un ConfigMap que falta, y arréglalos.",
+     ["CrashLoopBackOff", "OOMKilled", "livenessProbe", "ConfigMap", "kubectl describe"]),
+    ("162", "Pods en Pending", "O", 2, ["Kubernetes", "SRE"],
+     "Ningún pod arranca. Lee los eventos del scheduler: taint olvidado, requests imposibles, nodeSelector sin nodo y PVC con StorageClass inexistente.",
+     ["Pending", "scheduler", "taints", "nodeSelector", "PVC"]),
+    ("163", "Requests y límites (QoS)", "O", 3, ["Kubernetes", "SRE"],
+     "Un pod estrangulado por su límite de CPU y la api crítica como BestEffort. Ajusta requests y limits, clases QoS y una LimitRange por defecto.",
+     ["requests", "limits", "QoS", "CFS throttling", "LimitRange"]),
+    ("164", "Helm", "O", 3, ["Kubernetes", "DevOps"],
+     "Un upgrade dejó prod en ImagePullBackOff. Haz rollback con Helm, parametriza el chart y despliega staging con su propio fichero de valores.",
+     ["Helm", "chart", "values", "upgrade", "rollback"]),
+    ("165", "NetworkPolicies", "O", 3, ["Kubernetes", "DevSecOps"],
+     "Red plana: cualquier pod llega a la base de datos. Aplica negar por defecto y abre sólo frontend→api, api→db y monitoring→api.",
+     ["NetworkPolicy", "default-deny", "podSelector", "namespaceSelector", "k3s"]),
+    ("166", "Escalado con HPA", "O", 3, ["Kubernetes", "SRE"],
+     "El HPA nunca escala: el Deployment no declara requests de CPU. Arréglalo, evita el aleteo con una ventana de estabilización y compruébalo con carga.",
+     ["HPA", "metrics-server", "requests", "stabilizationWindow", "autoscaling/v2"]),
+    ("167", "Argo CD fuera de sincronía", "O", 3, ["Kubernetes", "DevOps"],
+     "Cambios a mano en la guardia dejaron la app OutOfSync. Lleva a git lo bueno, revierte lo malo y activa auto-sync con selfHeal y prune.",
+     ["Argo CD", "GitOps", "drift", "selfHeal", "prune"]),
+    ("168", "Terraform: lock y drift", "O", 3, ["IaC", "DevOps"],
+     "Un job de CI murió y dejó el estado bloqueado. Libera el bloqueo con criterio, revierte el drift e importa un recurso creado a mano.",
+     ["Terraform", "estado remoto", "force-unlock", "refresh-only", "import"]),
+    ("169", "Terraform: módulos", "O", 3, ["IaC", "DevOps"],
+     "Tres equipos con el mismo bloque copiado. Conviértelo en un módulo con validación y for_each, y refactoriza con moved sin recrear nada.",
+     ["módulos", "variables", "validation", "for_each", "moved"]),
+    ("170", "OpenTelemetry", "O", 3, ["Observabilidad", "SRE"],
+     "No llegan trazas a Jaeger. Arregla el Collector, nombra el servicio, propaga el contexto entre front y back y encuentra el span lento.",
+     ["OpenTelemetry", "OTLP", "Collector", "Jaeger", "traceparent"]),
+    ("171", "Métricas RED", "O", 2, ["Observabilidad", "SRE"],
+     "La tienda sólo cuenta peticiones en total. Instrumenta Rate, Errors y Duration por ruta, arregla el scrape, escribe recording rules y un dashboard.",
+     ["Prometheus", "Histogram", "recording rules", "PromQL", "Grafana"]),
+    ("172", "SLO y presupuesto de error", "O", 3, ["Observabilidad", "SRE"],
+     "Una alerta ruidosa que todos silencian. Sustitúyela por alertas multiventana de burn rate según el SLO; tests ocultos con promtool.",
+     ["SLO", "error budget", "burn rate", "promtool test", "alertas"]),
+    ("173", "Verde, pero fallando", "O", 3, ["Observabilidad", "SRE"],
+     "Todos los health checks en verde y las compras fallan. Encuentra una fuga del pool de conexiones, una cuota de CPU y un DNS muerto.",
+     ["health checks", "pool de conexiones", "CPUQuota", "resolv.conf", "latencia"]),
+    ("174", "Escaneo en el pipeline", "O", 3, ["DevSecOps", "DevOps"],
+     "El pipeline escanea pero nunca falla. Haz que Semgrep y Trivy bloqueen de verdad, arregla los hallazgos y justifica la única excepción.",
+     ["Semgrep", "SAST", "Trivy", "SCA", "nosemgrep"]),
+    ("175", "Vault: credenciales dinámicas", "O", 3, ["DevSecOps", "SRE"],
+     "La contraseña de la base de datos se filtró en un .env del repo. Rótala y cambia la app a credenciales dinámicas de Vault con TTL y política mínima.",
+     ["Vault", "secrets engine", "database", "TTL", "políticas"]),
+    ("176", "PostgreSQL: PITR", "O", 3, ["SRE"],
+     "Un DELETE sin WHERE borró los pedidos. Restaura a otra instancia hasta un segundo antes con backup base y WAL, y devuelve sólo lo perdido.",
+     ["PostgreSQL", "PITR", "WAL", "pg_basebackup", "recovery_target_time"]),
+    ("177", "Pruebas de carga con k6", "O", 2, ["SRE", "DevOps"],
+     "El catálogo va bien con un usuario. Escribe una prueba k6 con etapas y umbrales, encuentra dos cuellos de botella en serie y arréglalos.",
+     ["k6", "stages", "thresholds", "cuello de botella", "índices"]),
+    ("178", "Incidente completo", "O", 2, ["SRE"],
+     "Alerta de 5xx: el volumen de logs está lleno. Restaura, quita la causa, configura logrotate, comunica y escribe un postmortem sin culpables.",
+     ["guardia", "disco lleno", "logrotate", "comunicación", "postmortem"]),
+    ("179", "Portal interno (catálogo)", "O", 2, ["DevOps"],
+     "Nadie se fía del catálogo de software. Arregla sus catalog-info.yaml al estilo Backstage y registra un servicio con dueño, dependencias y TechDocs.",
+     ["Backstage", "catalog-info.yaml", "ownership", "TechDocs", "platform engineering"]),
+    ("180", "Automatizar con Python y Bash", "O", 2, ["DevOps", "SRE"],
+     "Un script de rotación de backups que borra lo que no debe y un informe frágil. Reescríbelos robustos: dry-run, lock, códigos de salida y shellcheck limpio.",
+     ["Bash", "set -euo pipefail", "flock", "shellcheck", "argparse"]),
+    ("181", "Apagado limpio", "O", 2, ["DevOps", "SRE"],
+     "Cada despliegue corta peticiones y deja zombis. Arregla PID 1, la forma exec y el manejo de SIGTERM para que el contenedor se apague limpio.",
+     ["SIGTERM", "PID 1", "exec form", "init", "zombis"]),
+    ("182", "Versionado y releases (SemVer)", "O", 2, ["DevOps"],
+     "Las versiones se ponen a ojo. Calcula la siguiente versión desde Conventional Commits, publica la release con tag anotado y CHANGELOG.",
+     ["SemVer", "Conventional Commits", "git tag", "CHANGELOG", "BREAKING CHANGE"]),
+    ("183", "Compose para un VPS", "O", 2, ["DevOps"],
+     "Un compose de portátil en producción: base de datos expuesta, contraseña en el YAML y sin volumen. Déjalo listo para un VPS.",
+     ["Docker Compose", "healthcheck", "secrets", "volúmenes", "restart"]),
+    ("184", "Imágenes multiarquitectura", "O", 2, ["DevOps"],
+     "Los servidores nuevos son ARM64. Publica una imagen con variantes amd64 y arm64, cada una con su binario, compilando en cruzado sin emulación.",
+     ["buildx", "multiplataforma", "BUILDPLATFORM", "TARGETARCH", "registro"]),
+    ("185", "Logs para producción", "O", 2, ["SRE", "Observabilidad"],
+     "Logs de texto libre, trazas partidas, DEBUG siempre y tokens en claro. Pásalos a JSON con request_id, niveles por entorno y datos enmascarados.",
+     ["logging estructurado", "JSON", "request_id", "LOG_LEVEL", "datos sensibles"]),
+    ("186", "Tests inestables (flaky)", "O", 2, ["DevOps"],
+     "La suite falla a veces y todos le dan a re-run. Hazla determinista frente al orden, el azar, la hora y los puertos, sin reintentos.",
+     ["pytest", "flaky tests", "fixtures", "faketime", "mutación"]),
+    ("187", "Pipeline lento", "O", 2, ["DevOps"],
+     "Cada commit tarda casi un minuto en CI. Ordena las capas, añade .dockerignore y una caché de dependencias por hash sin romper nada.",
+     ["CI", "caché de capas", ".dockerignore", "caché por hash", "Woodpecker"]),
+    ("188", "Runner de CI propio", "O", 3, ["DevSecOps", "DevOps"],
+     "El runner propio ejecuta PRs de cualquiera como root y con el token del registro. Aíslalo: usuario propio, espacio efímero, timeout y sandbox.",
+     ["self-hosted runner", "systemd sandbox", "ProtectSystem", "PrivateTmp", "mínimo privilegio"]),
+    ("189", "Vistas previas por PR", "O", 2, ["DevOps"],
+     "Las vistas previas se pisan, usan datos de producción y no se borran. Haz un entorno efímero y aislado por PR, con limpieza automática.",
+     ["entornos efímeros", "Docker Compose", "proyectos", "datos de prueba", "limpieza"]),
+    ("190", "Feature flags", "O", 2, ["DevOps"],
+     "Flags en variables de entorno, todo o nada y al azar. Pásalos a un fichero en caliente, con porcentaje estable e interruptor de emergencia.",
+     ["feature flags", "despliegue progresivo", "hash estable", "kill switch", "recarga en caliente"]),
+    ("191", "Rollback con cambio de base de datos", "O", 3, ["DevOps", "SRE"],
+     "La v2 renombra una columna y volver a la v1 deja la tienda en 500. Reescribe la migración como expandir/contraer para poder volver siempre.",
+     ["rollback", "migraciones", "expand/contract", "compatibilidad", "SQLite"]),
+    ("192", "Services sin tráfico", "O", 2, ["Kubernetes"],
+     "Pods en Running y Services que no responden. Cuatro causas: selector, targetPort, readiness y puerto con nombre.",
+     ["Service", "EndpointSlice", "selector", "targetPort", "readinessProbe"]),
+    ("193", "cert-manager", "O", 3, ["Kubernetes", "DevSecOps"],
+     "El certificado de la tienda nunca se emite. Arregla emisor, nombres y Secret para servir HTTPS con la CA interna y renovación automática.",
+     ["cert-manager", "TLS", "ClusterIssuer", "CA interna", "renovación"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
@@ -905,6 +1010,16 @@ def labs_payload():
     return out
 
 
+class LabServer(ThreadingHTTPServer):
+    # El navegador corta conexiones a medio responder (recarga, cambio de
+    # pestaña, fetch abortado). No es un fallo del servidor: no ensuciar la consola.
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], (ConnectionAbortedError,
+                                          ConnectionResetError, BrokenPipeError)):
+            return
+        super().handle_error(request, client_address)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "TerminalCeroLab/1.0"
 
@@ -1145,7 +1260,7 @@ def main():
             pass
     if not os.path.isdir(WEB_DIR):
         print(f"[!] No existe {WEB_DIR}", file=sys.stderr)
-    httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    httpd = LabServer(("127.0.0.1", PORT), Handler)
     httpd.daemon_threads = True
     # SIGTERM (kill) y, en Windows, cerrar la consola (SIGBREAK) siguen el
     # mismo camino que Ctrl+C: destruir los labs antes de salir.

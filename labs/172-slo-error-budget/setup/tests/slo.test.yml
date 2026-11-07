@@ -1,0 +1,80 @@
+# Tests ocultos del lab 172 (los ejecuta check.sh con promtool test rules).
+rule_files: [rules.yml]
+evaluation_interval: 1m
+tests:
+  - name: quema rápida (10% de errores)
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{job="checkout",code="200"}'
+        values: '0+90x180'
+      - series: 'http_requests_total{job="checkout",code="500"}'
+        values: '0+10x180'
+    promql_expr_test:
+      - expr: round(slo:sli_error:ratio_rate1h, 0.001)
+        eval_time: 60m
+        exp_samples:
+          - labels: '{job="checkout"}'
+            value: 0.1
+      - expr: round(slo:sli_error:ratio_rate6h, 0.001)
+        eval_time: 60m
+        exp_samples:
+          - labels: '{job="checkout"}'
+            value: 0.1
+      - expr: round(slo:sli_error:ratio_rate5m, 0.001)
+        eval_time: 60m
+        exp_samples:
+          - labels: '{job="checkout"}'
+            value: 0.1
+      - expr: round(slo:sli_error:ratio_rate30m, 0.001)
+        eval_time: 60m
+        exp_samples:
+          - labels: '{job="checkout"}'
+            value: 0.1
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: CheckoutSLOBurnRateRapida
+        exp_alerts:
+          - exp_labels: {severity: page, job: checkout}
+      - eval_time: 60m
+        alertname: CheckoutSLOBurnRateLenta
+        exp_alerts:
+          - exp_labels: {severity: ticket, job: checkout}
+
+  - name: consumo normal (1% de errores, 2x el presupuesto) no despierta a nadie
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{job="checkout",code="200"}'
+        values: '0+99x480'
+      - series: 'http_requests_total{job="checkout",code="500"}'
+        values: '0+1x480'
+    alert_rule_test:
+      - {eval_time: 60m,  alertname: CheckoutSLOBurnRateRapida, exp_alerts: []}
+      - {eval_time: 420m, alertname: CheckoutSLOBurnRateRapida, exp_alerts: []}
+      - {eval_time: 60m,  alertname: CheckoutSLOBurnRateLenta,  exp_alerts: []}
+      - {eval_time: 420m, alertname: CheckoutSLOBurnRateLenta,  exp_alerts: []}
+      - {eval_time: 60m,  alertname: CheckoutErrores,           exp_alerts: []}
+
+  - name: quema lenta (4% de errores) abre ticket, no despierta
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{job="checkout",code="200"}'
+        values: '0+96x600'
+      - series: 'http_requests_total{job="checkout",code="500"}'
+        values: '0+4x600'
+    alert_rule_test:
+      - eval_time: 420m
+        alertname: CheckoutSLOBurnRateLenta
+        exp_alerts:
+          - exp_labels: {severity: ticket, job: checkout}
+      - {eval_time: 420m, alertname: CheckoutSLOBurnRateRapida, exp_alerts: []}
+
+  - name: pico corto ya resuelto no sigue sonando (ventana corta)
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{job="checkout",code="200"}'
+        values: '0+50x10 500+100x110'
+      - series: 'http_requests_total{job="checkout",code="500"}'
+        values: '0+50x10 500+0x110'
+    alert_rule_test:
+      - {eval_time: 25m, alertname: CheckoutSLOBurnRateRapida, exp_alerts: []}
+      - {eval_time: 60m, alertname: CheckoutSLOBurnRateRapida, exp_alerts: []}

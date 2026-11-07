@@ -1,0 +1,14 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-167
+    hostname: k8s-167
+    privileged: true      # systemd + Kubernetes (k3s) dentro del contenedor
+    cgroup: private
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7767:7681"   # terminal web (ttyd)

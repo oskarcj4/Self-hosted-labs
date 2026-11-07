@@ -1,0 +1,26 @@
+[Unit]
+Description=k3s: Kubernetes de un nodo para el lab
+After=network-online.target
+
+[Service]
+Type=notify
+# kubelet necesita propagación de montajes compartida (como hace kind).
+ExecStartPre=/bin/mount --make-rshared /
+ExecStart=/usr/local/bin/k3s server --node-name nodo1 \
+  --disable traefik --disable servicelb \
+  --snapshotter native --write-kubeconfig-mode 644 \
+  --kube-proxy-arg=conntrack-max-per-core=0 \
+  --kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1% \
+  --kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%
+Delegate=yes
+KillMode=process
+LimitNOFILE=1048576
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+TimeoutStartSec=0
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
