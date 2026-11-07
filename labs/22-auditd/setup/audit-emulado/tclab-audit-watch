@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# tclab-audit-watch <fichero> <permisos> <clave> [fichero-pid]: vigilante de una regla -w del
+# auditctl emulado. Escribe registros con formato de auditd en audit.log.
+F=$1; P=$2; K=$3
+[ -n "$4" ] && echo $$ > "$4"
+DIR=$(dirname "$F"); BASE=$(basename "$F")
+LOG=/var/log/audit/audit.log
+SERIE=/var/lib/tclab-audit/serie
+EV=""
+[[ $P == *w* ]] && EV="$EV,modify,close_write,moved_to,moved_from,create,delete"
+[[ $P == *a* ]] && EV="$EV,attrib"
+[[ $P == *r* ]] && EV="$EV,access,open"
+[[ $P == *x* ]] && EV="$EV,open"
+EV=${EV#,}
+HERR='useradd|usermod|userdel|passwd|chfn|chsh|vipw|vigr|groupadd|groupmod|adduser|deluser|chpasswd|newusers|sed|tee|vi|vim|vim.tiny|nano|cp|mv|install|chmod|chown|python3|perl'
+quien(){ # proceso que está tocando el fichero: primero herramientas conocidas, si no un shell
+  ps -eo pid=,ppid=,uid=,comm= --sort=-start_time 2>/dev/null | awk -v h="^($HERR)$" '$4 ~ h {print; exit}'
+}
+ULT=""; ULT_T=0
+# Se vigila el directorio: useradd, passwd y vipw reemplazan el fichero con
+# rename(). Sus ficheros auxiliares (passwd.lock, passwd+, passwd-) avisan
+# antes, mientras el proceso aún vive: ahí se apunta quién es.
+inotifywait -m -q -e "$EV,create" --format '%e|%f' "$DIR" | while IFS='|' read -r e f; do
+  if [ "$f" != "$BASE" ]; then
+    case "$f" in "$BASE".*|"$BASE"+|"$BASE"-) q=$(quien); [ -n "$q" ] && { ULT=$q; ULT_T=$SECONDS; };; esac
+    continue
+  fi
+  case "$e" in
+    *ATTRIB*) sc=90; per=a; [[ $P == *a* ]] || continue;;
+    *MOVED_TO*|*MOVED_FROM*) sc=82; per=w; [[ $P == *w* ]] || continue;;
+    *CREATE*) sc=257; per=w; [[ $P == *w* ]] || continue;;
+    *DELETE*) sc=87; per=w; [[ $P == *w* ]] || continue;;
+    *MODIFY*|*CLOSE_WRITE*) sc=1; per=w; [[ $P == *w* ]] || continue;;
+    *ACCESS*|*OPEN*) sc=257; per=r; [[ $P == *[rx]* ]] || continue
+      # ps también lee este fichero: no registrar las lecturas propias en ráfaga
+      [ "$SECONDS" = "${ULT_R:-x}" ] && continue; ULT_R=$SECONDS;;
+    *) continue;;
+  esac
+  pr=$(quien)
+  [ -z "$pr" ] && [ -n "$ULT" ] && [ $((SECONDS - ULT_T)) -le 2 ] && pr=$ULT
+  [ -z "$pr" ] && pr=$(ps -eo pid=,ppid=,uid=,comm= --sort=-start_time | awk '$4 ~ /^(bash|sh|dash)$/ {print; exit}')
+  read -r pid ppid uid comm <<<"${pr:-0 0 0 ?}"
+  exe=$(readlink "/proc/$pid/exe" 2>/dev/null || command -v "$comm" 2>/dev/null || echo "?")
+  auid=$(cat "/proc/$pid/loginuid" 2>/dev/null || echo 4294967295)
+  n=$(( $(cat $SERIE 2>/dev/null || echo 100) + 1 )); echo $n > $SERIE
+  ts=$(date +%s.%3N)
+  {
+    echo "type=SYSCALL msg=audit($ts:$n): arch=c000003e syscall=$sc success=yes exit=0 ppid=$ppid pid=$pid auid=$auid uid=$uid gid=0 euid=0 tty=(none) comm=\"$comm\" exe=\"$exe\" key=\"${K:-(null)}\""
+    echo "type=CWD msg=audit($ts:$n): cwd=\"/\""
+    echo "type=PATH msg=audit($ts:$n): item=0 name=\"$F\" nametype=NORMAL perm=$per inotify_event=$e"
+    echo "type=PROCTITLE msg=audit($ts:$n): proctitle=\"$comm\""
+  } >> $LOG
+done

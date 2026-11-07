@@ -6,6 +6,7 @@ services:
     hostname: audit-22
     # auditd necesita el subsistema audit del kernel.
     privileged: true
+    init: true                # recoge los procesos huérfanos (vigilantes de reglas borradas)
     tty: true
     stdin_open: true
     ports:

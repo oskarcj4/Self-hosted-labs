@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+[ "$(id -u)" -eq 0 ] || exec sudo -n bash "$0" "$@"
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Al pasar, deja la marca de "resuelto": la plataforma destruye el lab poco después.
 trap '[ $? -eq 0 ] && { touch /tmp/.tclab-solved 2>/dev/null; echo "⏳ Lab resuelto: se autodestruirá en ~1 minuto."; }' EXIT
 # Validador del Lab 22.

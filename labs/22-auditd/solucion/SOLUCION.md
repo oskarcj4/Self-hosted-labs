@@ -45,3 +45,12 @@ bash /opt/lab/check.sh
   `~/.ssh/authorized_keys` detecta las persistencias de los labs 01, 05 y 10.
 - Los logs de audit deben enviarse fuera de la máquina: un atacante con root
   podría intentar borrarlos (lab 09).
+
+## Nota: auditctl dentro de contenedores
+
+En un contenedor, `auditctl` real falla con `Error sending status request
+(Operation not permitted)`, incluso con `--privileged`. El kernel sólo
+acepta peticiones de audit desde el PID namespace inicial del host, y en
+Docker Desktop/WSL2 ni siquiera `pid: host` lo es. El lab detecta este caso
+y usa una implementación compatible basada en inotify. Las reglas `-w` y
+`ausearch -k` se comportan igual que en un servidor.

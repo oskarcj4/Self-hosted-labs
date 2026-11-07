@@ -35,3 +35,12 @@ sudo augenrules --load
 ```bash
 bash /opt/lab/check.sh
 ```
+
+> **Nota sobre el entorno.** El kernel sólo deja configurar la auditoría
+> desde el espacio de procesos principal del host. Dentro de un contenedor,
+> `auditctl` real responde `Operation not permitted`. Por eso, si el kernel
+> lo rechaza, el lab instala versiones compatibles de `auditctl`, `ausearch`
+> y `augenrules` (en `/usr/local/sbin`). Admiten las reglas de fichero
+> (`-w`, `-p`, `-k`, `-W`, `-l`, `-D`) y escriben en
+> `/var/log/audit/audit.log` con el formato de auditd. Los comandos del lab
+> son los mismos que usarías en un servidor real.

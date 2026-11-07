@@ -1,7 +1,7 @@
 FROM debian:12-slim
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      auditd passwd procps grep \
+      auditd passwd procps grep inotify-tools gawk \
       vim-tiny nano less curl \
       sudo ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -11,6 +11,7 @@ RUN useradd -m -s /bin/bash analista \
     && echo 'analista:analista' | chpasswd \
     && echo 'analista ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/analista
 COPY setup/plant.sh /opt/lab/plant.sh
+COPY setup/audit-emulado/ /opt/lab/audit-emulado/
 COPY check.sh /opt/lab/check.sh
 COPY RETO.md /RETO.md
 RUN chmod +x /opt/lab/plant.sh /opt/lab/check.sh

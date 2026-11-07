@@ -1,0 +1,37 @@
+services:
+  lab:
+    build:
+      context: .
+    image: tclab-203:lab
+    container_name: tc-lab-203
+    hostname: control-203
+    privileged: true
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7803:7681"   # terminal web (ttyd)
+  web1:
+    image: tclab-203:lab       # misma imagen que el control (la construye "lab")
+    pull_policy: never
+    container_name: tc-lab-203-web1
+    hostname: web1
+    privileged: true
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+  web2:
+    image: tclab-203:lab       # misma imagen que el control (la construye "lab")
+    pull_policy: never
+    container_name: tc-lab-203-web2
+    hostname: web2
+    privileged: true
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
