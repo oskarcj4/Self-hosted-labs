@@ -10,7 +10,7 @@
 
 # 💸 Adiós a las plataformas que te cobran una fortuna por aprender hacking
 
-### 102 laboratorios reales de DevSecOps, SRE, respuesta a incidentes y hardening.<br>En tu máquina. Gratis. Con un solo comando.
+### 200 laboratorios reales de DevSecOps, SRE, respuesta a incidentes y hardening.<br>En tu máquina. Gratis. Con un solo comando.
 
 ```bash
 python server.py
