@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# ci-logs [n] — log del pipeline n (por defecto, el último). ci-logs -l: historial.
+if [ "${1:-}" = -l ]; then cat /var/lib/ci/historial 2>/dev/null; exit; fi
+N=${1:-$(cat /var/lib/ci/last 2>/dev/null)}
+cat "/var/lib/ci/logs/$N.log"

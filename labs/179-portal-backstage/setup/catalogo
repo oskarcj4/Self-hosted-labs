@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+"""catalogo: validador y portal mínimo para descriptores catalog-info.yaml.
+
+Sigue el formato de entidades de Backstage (backstage.io/v1alpha1), pero NO es
+Backstage: sólo carga el catálogo desde una Location raíz, valida las reglas
+principales del formato y resuelve las relaciones.
+
+  catalogo validar [DIR]          valida (código 0 si no hay errores ni avisos)
+  catalogo entidades [DIR]        lista las entidades cargadas
+  catalogo servir [DIR] [PUERTO]  portal: /, /api/entities, /api/entities/<kind>/<name>
+"""
+import html, json, os, re, sys
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import yaml
+
+KINDS = {"Component", "API", "System", "Domain", "Resource", "Group", "User", "Location"}
+API_VERSIONS = {"backstage.io/v1alpha1", "backstage.io/v1beta1"}
+NAME_RE = re.compile(r"^[A-Za-z0-9]([-_.A-Za-z0-9]{0,61}[A-Za-z0-9])?$")
+REQUIRED = {
+    "Component": ["type", "lifecycle", "owner"],
+    "API": ["type", "lifecycle", "owner", "definition"],
+    "System": ["owner"],
+    "Domain": ["owner"],
+    "Resource": ["type", "owner"],
+    "Group": ["type", "children"],
+    "User": ["memberOf"],
+    "Location": ["targets"],
+}
+# campo -> (kind por defecto, kinds permitidos)
+REFS = {
+    "owner": ("group", {"group", "user"}),
+    "system": ("system", {"system"}),
+    "domain": ("domain", {"domain"}),
+    "providesApis": ("api", {"api"}),
+    "consumesApis": ("api", {"api"}),
+    "dependsOn": (None, {"component", "resource"}),
+    "subcomponentOf": ("component", {"component"}),
+    "parent": ("group", {"group"}),
+    "children": ("group", {"group"}),
+    "memberOf": ("group", {"group"}),
+}
+
+
+def parse_ref(ref, default):
+    ref = str(ref)
+    kind, _, rest = ref.rpartition(":") if ":" in ref else (default or "", "", ref)
+    ns, _, name = rest.rpartition("/") if "/" in rest else ("default", "", rest)
+    return (kind or "").lower(), ns or "default", name
+
+
+class Catalogo:
+    def __init__(self, raiz):
+        self.raiz = os.path.abspath(raiz)
+        self.errores, self.avisos = [], []
+        self.entidades = {}          # (kind, ns, name) -> dict
+        self.cargados = set()
+        self._cargar(os.path.join(self.raiz, "catalog-info.yaml"))
+        self._huerfanos()
+        self._validar_refs()
+
+    def _rel(self, p):
+        return os.path.relpath(p, self.raiz)
+
+    def _cargar(self, fichero):
+        fichero = os.path.normpath(fichero)
+        if fichero in self.cargados:
+            return
+        self.cargados.add(fichero)
+        if not os.path.isfile(fichero):
+            self.errores.append(f"{self._rel(fichero)}: la Location apunta a un fichero que no existe")
+            return
+        try:
+            docs = [d for d in yaml.safe_load_all(open(fichero, encoding="utf-8")) if d is not None]
+        except yaml.YAMLError as e:
+            self.errores.append(f"{self._rel(fichero)}: YAML inválido: {str(e).splitlines()[0]}")
+            return
+        for d in docs:
+            self._entidad(d, fichero)
+
+    def _entidad(self, d, fichero):
+        donde = self._rel(fichero)
+        if not isinstance(d, dict):
+            self.errores.append(f"{donde}: cada documento debe ser un objeto"); return
+        kind, av = d.get("kind"), d.get("apiVersion")
+        meta, spec = d.get("metadata") or {}, d.get("spec") or {}
+        name = meta.get("name")
+        id_ = f"{kind}:{name}"
+        if av not in API_VERSIONS:
+            self.errores.append(f"{donde} {id_}: apiVersion '{av}' no válida (backstage.io/v1alpha1)")
+        if kind not in KINDS:
+            self.errores.append(f"{donde} {id_}: kind '{kind}' desconocido"); return
+        if not name or not NAME_RE.match(str(name)):
+            self.errores.append(f"{donde} {id_}: metadata.name '{name}' no válido "
+                                "(letras, números, - _ . ; máx. 63; sin empezar ni acabar en símbolo)")
+            return
+        for campo in REQUIRED[kind]:
+            if campo not in spec or spec[campo] in (None, ""):
+                self.errores.append(f"{donde} {id_}: falta spec.{campo}")
+        ns = meta.get("namespace", "default")
+        clave = (kind.lower(), ns, name)
+        if clave in self.entidades:
+            self.errores.append(f"{donde} {id_}: entidad duplicada (ya en {self.entidades[clave]['_fichero']})")
+            return
+        d["_fichero"] = donde
+        self.entidades[clave] = d
+        base = os.path.dirname(fichero)
+        if kind == "Location":
+            for t in spec.get("targets") or []:
+                self._cargar(os.path.join(base, t))
+        if kind == "API" and isinstance(spec.get("definition"), dict) and "$text" in spec["definition"]:
+            p = os.path.join(base, spec["definition"]["$text"])
+            if not os.path.isfile(p):
+                self.errores.append(f"{donde} {id_}: spec.definition.$text apunta a '{spec['definition']['$text']}', que no existe")
+        ref = (meta.get("annotations") or {}).get("backstage.io/techdocs-ref")
+        if ref:
+            if not str(ref).startswith("dir:"):
+                self.errores.append(f"{donde} {id_}: techdocs-ref debe ser 'dir:<ruta>'")
+            else:
+                dd = os.path.join(base, ref[4:])
+                if not (os.path.isfile(os.path.join(dd, "mkdocs.yml")) and os.path.isfile(os.path.join(dd, "docs", "index.md"))):
+                    self.errores.append(f"{donde} {id_}: techdocs-ref sin mkdocs.yml y docs/index.md en '{ref[4:]}'")
+
+    def _huerfanos(self):
+        for dirpath, dirs, files in os.walk(self.raiz):
+            dirs[:] = [x for x in dirs if not x.startswith(".")]
+            for f in files:
+                if f == "catalog-info.yaml":
+                    p = os.path.normpath(os.path.join(dirpath, f))
+                    if p not in self.cargados:
+                        self.avisos.append(f"{self._rel(p)}: no lo registra ninguna Location (el portal no lo ve)")
+
+    def _validar_refs(self):
+        for (kind, ns, name), d in self.entidades.items():
+            spec = d.get("spec") or {}
+            for campo, (defecto, permitidos) in REFS.items():
+                val = spec.get(campo)
+                if val in (None, ""):
+                    continue
+                for ref in val if isinstance(val, list) else [val]:
+                    k, rns, rn = parse_ref(ref, defecto)
+                    if not k:
+                        self.errores.append(f"{d['_fichero']} {d['kind']}:{name}: spec.{campo} '{ref}' necesita kind (p. ej. component:{ref})")
+                        continue
+                    if k not in permitidos:
+                        self.errores.append(f"{d['_fichero']} {d['kind']}:{name}: spec.{campo} '{ref}' no puede ser de tipo {k}")
+                    elif (k, rns, rn) not in self.entidades:
+                        self.errores.append(f"{d['_fichero']} {d['kind']}:{name}: spec.{campo} '{ref}' no existe en el catálogo")
+
+    def vista(self, clave):
+        kind, ns, name = clave
+        d = self.entidades[clave]
+        spec = d.get("spec") or {}
+        rel = {}
+        for campo, (defecto, _) in REFS.items():
+            v = spec.get(campo)
+            if v not in (None, ""):
+                rel[campo] = ["{}:{}/{}".format(*parse_ref(r, defecto)) for r in (v if isinstance(v, list) else [v])]
+        inversas = []
+        for (k2, ns2, n2), d2 in self.entidades.items():
+            s2 = d2.get("spec") or {}
+            for campo, (defecto, _) in REFS.items():
+                v = s2.get(campo)
+                for r in (v if isinstance(v, list) else [v]) if v not in (None, "") else []:
+                    if parse_ref(r, defecto) == (kind, ns, name):
+                        inversas.append({"desde": f"{k2}:{ns2}/{n2}", "campo": campo})
+        return {"ref": f"{kind}:{ns}/{name}", "kind": d["kind"], "metadata": d.get("metadata"),
+                "spec": spec, "relaciones": rel, "referenciadoPor": inversas, "fichero": d["_fichero"]}
+
+
+def portal(raiz, puerto):
+    class H(BaseHTTPRequestHandler):
+        def _send(self, code, body, ctype):
+            b = body.encode()
+            self.send_response(code); self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+
+        def do_GET(self):
+            c = Catalogo(raiz)              # se recarga en cada petición
+            partes = [p for p in self.path.split("?")[0].split("/") if p]
+            if partes[:2] == ["api", "entities"]:
+                if len(partes) == 2:
+                    return self._send(200, json.dumps([c.vista(k) for k in sorted(c.entidades)], ensure_ascii=False, indent=1), "application/json")
+                if len(partes) == 4:
+                    k = (partes[2].lower(), "default", partes[3])
+                    if k in c.entidades:
+                        return self._send(200, json.dumps(c.vista(k), ensure_ascii=False, indent=1), "application/json")
+                return self._send(404, '{"error": "no existe"}', "application/json")
+            if partes == ["api", "estado"]:
+                return self._send(200, json.dumps({"errores": c.errores, "avisos": c.avisos}, ensure_ascii=False, indent=1), "application/json")
+            filas = "".join(
+                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+                    html.escape(d["kind"]), html.escape(n), html.escape(str((d.get("spec") or {}).get("owner", ""))),
+                    html.escape(str((d.get("spec") or {}).get("system", ""))), html.escape(str((d.get("spec") or {}).get("lifecycle", ""))))
+                for (k, ns, n), d in sorted(c.entidades.items()))
+            problemas = "".join(f"<li>{html.escape(e)}</li>" for e in c.errores + c.avisos) or "<li>ninguno</li>"
+            self._send(200, f"""<!doctype html><meta charset="utf-8"><title>Portal interno</title>
+<h1>Catálogo de software</h1><table border=1 cellpadding=4><tr><th>kind</th><th>nombre</th><th>owner</th>
+<th>system</th><th>lifecycle</th></tr>{filas}</table><h2>Problemas</h2><ul>{problemas}</ul>""", "text/html; charset=utf-8")
+
+        def log_message(self, *a):
+            pass
+
+    ThreadingHTTPServer(("127.0.0.1", puerto), H).serve_forever()
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] not in ("validar", "entidades", "servir"):
+        print(__doc__); sys.exit(2)
+    raiz = sys.argv[2] if len(sys.argv) > 2 else "."
+    if sys.argv[1] == "servir":
+        return portal(raiz, int(sys.argv[3]) if len(sys.argv) > 3 else 7007)
+    c = Catalogo(raiz)
+    if sys.argv[1] == "entidades":
+        for k in sorted(c.entidades):
+            d = c.entidades[k]
+            print(f"{d['kind']:<10} {k[2]:<22} owner={(d.get('spec') or {}).get('owner', '-')}")
+        return
+    for e in c.errores:
+        print("ERROR ", e)
+    for a in c.avisos:
+        print("AVISO ", a)
+    print(f"{len(c.entidades)} entidades · {len(c.errores)} errores · {len(c.avisos)} avisos")
+    sys.exit(1 if c.errores or c.avisos else 0)
+
+
+if __name__ == "__main__":
+    main()

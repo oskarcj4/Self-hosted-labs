@@ -1,0 +1,21 @@
+[Unit]
+Description=k3s: Kubernetes de dos nodos (servidor o agente según el contenedor) para el lab
+After=network-online.target
+
+[Service]
+Type=notify
+# kubelet necesita propagación de montajes compartida (como hace kind).
+ExecStartPre=/bin/mount --make-rshared /
+ExecStart=/usr/local/bin/k3s-arranque
+Delegate=yes
+KillMode=process
+LimitNOFILE=1048576
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+TimeoutStartSec=0
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

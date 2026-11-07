@@ -1,0 +1,12 @@
+#!/bin/sh
+# Arranca k3s como servidor (nodo1, contenedor "lab") o como agente (nodo2,
+# contenedor "nodo2"): los dos contenedores usan la misma imagen.
+TOKEN=tclab-197-token-del-cluster
+COMUN="--snapshotter native --kube-proxy-arg=conntrack-max-per-core=0 \
+  --kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1% \
+  --kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%"
+if [ "$(hostname)" = k8s-197-nodo2 ]; then
+  exec /usr/local/bin/k3s agent --node-name nodo2 --server https://lab:6443 --token "$TOKEN" $COMUN
+fi
+exec /usr/local/bin/k3s server --node-name nodo1 --token "$TOKEN" --tls-san lab \
+  --disable traefik --disable servicelb --write-kubeconfig-mode 644 $COMUN

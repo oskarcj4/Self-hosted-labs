@@ -32,27 +32,78 @@ a la Tanda 2 y todo lo posterior corre +2. Numeración final: 152–226.
 | 158 | Revisión antes de salir (checklist go-live) | ✅ 6/6 |
 
 ## Tanda 2 — CI y Kubernetes núcleo (★) · labs 159–165
-159 Pipeline completo (test/build/escaneo/publicar/desplegar/rollback) ·
-160 Monorepo (construir/desplegar solo lo que cambió) · 161 CrashLoopBackOff ·
-162 Pods en Pending · 163 Requests y límites (QoS) · 164 Helm · 165 NetworkPolicies
+Kubernetes: k3s v1.31 de un nodo dentro del contenedor (systemd + `k3s.service`,
+snapshotter `native`, imágenes airgap y de cargas precargadas: arranca sin red).
+Andamiaje común idéntico en todos los labs k8s (mismas capas de Docker).
+
+| Lab | Tema | Estado |
+|-----|------|--------|
+| 159 | Pipeline completo (test/gitleaks/build por SHA/registro/deploy con rollback) | 🟡 escrito, falta probar en Docker |
+| 160 | Monorepo (construir solo lo que cambió) | 🟡 lógica probada 7/7 en local; falta probar en Docker |
+| 161 | CrashLoopBackOff (OOMKilled, liveness, ConfigMap) | 🟡 escrito, falta probar en Docker |
+| 162 | Pods en Pending (taint, cpu, nodeSelector, StorageClass) | 🟡 escrito, falta probar en Docker |
+| 163 | Requests y límites (QoS, throttling, LimitRange) | 🟡 escrito, falta probar en Docker |
+| 164 | Helm (rollback, chart parametrizado, values por ambiente) | 🟡 escrito, falta probar en Docker |
+| 165 | NetworkPolicies (default-deny + flujos mínimos) | 🟡 escrito, falta probar en Docker |
 
 ## Tanda 3 — Kubernetes + IaC (★) · labs 166–172
-166 Escalado (HPA/KEDA) · 167 Argo CD fuera de sincronía · 168 Terraform lock/drift ·
-169 Módulos reutilizables · 170 OpenTelemetry · 171 Métricas RED · 172 SLO y presupuesto de error
+Terraform usa el proveedor `kubernetes` contra el k3s del lab, con proveedores
+en un espejo local (`terraform init` sin red). Estado remoto del 168: backend
+`http` con bloqueo servido por `tf-state-server` (MinIO retiró sus binarios
+públicos). Observabilidad (170–172): systemd sin k3s.
+
+| Lab | Tema | Estado |
+|-----|------|--------|
+| 166 | Escalado con HPA (requests, estabilización, prueba de carga) | 🟡 escrito, falta probar en Docker |
+| 167 | Argo CD fuera de sincronía (drift, hotfix a git, selfHeal/prune) | 🟡 escrito, falta probar en Docker |
+| 168 | Terraform: lock huérfano, drift e import | 🟡 backend de estado probado con Terraform 1.11 real; falta Docker |
+| 169 | Terraform: módulos, validation, for_each, moved | 🟡 módulo y validation probados con `terraform validate`; falta Docker |
+| 170 | OpenTelemetry (Collector, service.name, propagación, span lento) | 🟡 propagación probada en local con el SDK 1.29; falta Docker |
+| 171 | Métricas RED (Counter/Histogram, scrape, recording rules, Grafana) | 🟡 instrumentación probada en local; falta Docker |
+| 172 | SLO y error budget (burn rate multiventana, tests ocultos promtool) | 🟡 tests ocultos probados con promtool 2.55 (solución pasa, reglas ingenuas y de una sola ventana fallan); falta Docker |
 
 ## Tanda 4 — Observabilidad, seguridad y confiabilidad (★) · labs 173–179
-173 Verde, pero fallando · 174 Escaneo en el pipeline (Trivy/Semgrep) · 175 Vault ·
-176 Backup/restauración PostgreSQL (PITR) · 177 Pruebas de carga (k6) ·
-178 Incidente completo (postmortem) · 179 Portal Backstage
+Todos sobre systemd (sin k3s). El 179 no instala Backstage real (Node.js +
+PostgreSQL, varios GB): usa el mismo formato `catalog-info.yaml` con un
+validador y un portal mínimos propios, y el RETO lo dice.
+
+| Lab | Tema | Estado |
+|-----|------|--------|
+| 173 | Verde, pero fallando (fuga del pool, CPUQuota, DNS muerto) | 🟡 escrito, falta probar en Docker |
+| 174 | Escaneo en el pipeline (Semgrep + Trivy que bloquean, nosemgrep justificado) | 🟡 escrito; las reglas Semgrep no se han podido probar en Windows; falta Docker |
+| 175 | Vault: credenciales dinámicas de PostgreSQL (TTL, política, rotar la filtrada) | 🟡 escrito, falta probar en Docker |
+| 176 | PostgreSQL PITR (backup base + WAL, instancia aparte en 5433) | 🟡 escrito, falta probar en Docker |
+| 177 | Pruebas de carga con k6 (stages, thresholds, dos cuellos en serie) | 🟡 coste del SCAN frente al índice medido en local; falta Docker |
+| 178 | Incidente completo (disco lleno, logrotate, comunicado, postmortem) | 🟡 parser del postmortem probado en local; falta Docker |
+| 179 | Portal interno al estilo Backstage (catálogo, ownership, TechDocs) | 🟡 validador, portal y solve probados en local; falta Docker |
 
 ## Tanda 5 — labs 180–186
-180 Automatizar con Python y Bash (★) · 181 Apagado limpio (SIGTERM/PID 1) ·
-182 Versionado y releases (SemVer) · 183 Compose para un VPS · 184 Imágenes multiarquitectura (buildx) ·
-185 Logs para producción · 186 Pruebas inestables (flaky)
+Base systemd (180, 182, 185, 186) o Docker-in-Docker (181, 183, 184: Docker
+corre dentro del lab, con las imágenes precargadas en la imagen del lab).
+
+| Lab | Título | Estado |
+|-----|--------|--------|
+| 180 | Automatizar con Python y Bash (★): rotación de backups y informe robustos | 🟡 casos ocultos probados en local (salvo el lock: no hay flock en Windows); falta Docker |
+| 181 | Apagado limpio (SIGTERM / PID 1 / zombis) | 🟡 transformación de la solución probada; falta Docker |
+| 182 | Versionado y releases (SemVer + Conventional Commits) | 🟡 10 casos ocultos y release probados en local; falta Docker |
+| 183 | Compose para un VPS (puertos, volumen, secrets, healthchecks) | 🟡 revisión estática con `docker compose config` probada (bueno/malo); falta Docker |
+| 184 | Imágenes multiarquitectura (buildx, compilación cruzada) | 🟡 lector ELF probado; falta Docker |
+| 185 | Logs para producción (JSON, request_id, enmascarado) | 🟡 app de la solución probada en local contra el análisis del check; falta Docker |
+| 186 | Tests inestables (orden, azar, hora, puerto) | 🟡 plantado falla y solución pasa en local; mutantes detectados; faketime sin probar (Windows); falta Docker |
 
 ## Tanda 6 — labs 187–193 (normales)
-187 Pipeline lento · 188 Runners propios · 189 Ambientes de vista previa · 190 Feature flags ·
-191 Rollback con cambio de base de datos · 192 Service sin tráfico · 193 cert-manager
+187 reutiliza el andamiaje Woodpecker del 159 (DinD) y 189 es DinD; 188, 190 y
+191 son systemd; 192 y 193 son k3s (193 con cert-manager v1.16.2 precargado).
+
+| Lab | Título | Estado |
+|-----|--------|--------|
+| 187 | Pipeline lento (capas, .dockerignore, caché por hash) | 🟡 escrito; falta Docker |
+| 188 | Runner de CI propio (usuario, efímero, timeout, sandbox systemd) | 🟡 escrito; falta Docker |
+| 189 | Vistas previas por PR (proyecto/imagen/volumen por PR, gc) | 🟡 parseo de gc probado en local; falta Docker |
+| 190 | Feature flags (fichero en caliente, hash estable, kill switch) | 🟡 módulo de flags probado en local contra los casos del check; falta Docker |
+| 191 | Rollback con cambio de base de datos (expand/contract) | 🟡 migración y SQL de v1/v2 probados en local; falta Docker |
+| 192 | Services sin tráfico (selector, targetPort, readiness, puerto con nombre) | 🟡 escrito; falta Docker |
+| 193 | cert-manager (ClusterIssuer, dnsNames, Secret, renovación) | 🟡 escrito; falta Docker |
 
 ## Tanda 7 — labs 194–200 (normales)
 194 Kustomize · 195 StatefulSets · 196 RBAC · 197 Mantenimiento de nodos (drain/PDB) ·

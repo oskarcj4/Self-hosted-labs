@@ -2,7 +2,7 @@
 "use strict";
 
 const view = document.getElementById("view");
-const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)", H: "Máquinas HTB (red / blue)", I: "Defensa del host", J: "Monitoreo, SOC y redes", K: "Hardening web", L: "En tu sistema: guías (bajo tu riesgo)", M: "DevOps: incidentes reales" };
+const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)", H: "Máquinas HTB (red / blue)", I: "Defensa del host", J: "Monitoreo, SOC y redes", K: "Hardening web", L: "En tu sistema: guías (bajo tu riesgo)", M: "DevOps: incidentes reales", N: "Mr. Robot: defensa azul", O: "DevOps / Cloud native moderno y almacenamiento" };
 let STATE = { labs: [], cursos: [], filter: "all", view: "home" };
 const POLL_MS = 8000; // refresco de "labs en ejecución"
 
@@ -513,8 +513,8 @@ function renderHome() {
   setHash("");
   setNav("home");
   const labs = STATE.labs.filter((l) => STATE.filter === "all" || l.track === STATE.filter);
-  const byTrack = { A: [], B: [], C: [], D: [], E: [], F: [], G: [], H: [], I: [], J: [], K: [], L: [], M: [] };
-  labs.forEach((l) => byTrack[l.track].push(l));
+  const byTrack = Object.fromEntries(Object.keys(TRACKS).map((t) => [t, []]));
+  labs.forEach((l) => (byTrack[l.track] ||= []).push(l));
   const trackHTML = (t) => (STATE.filter === "all" || STATE.filter === t)
     ? `<div class="section-label">${TRACKS[t]}</div>
     <div class="grid">${byTrack[t].map(cardHTML).join("") || '<p class="empty">Sin labs en esta pista.</p>'}</div>` : "";
@@ -526,19 +526,7 @@ function renderHome() {
     </section>
     <div class="section-label" id="runningLabel">En ejecución</div>
     <div id="runningSlot">${runningPanelHTML()}</div>
-    ${trackHTML("A")}
-    ${trackHTML("B")}
-    ${trackHTML("C")}
-    ${trackHTML("D")}
-    ${trackHTML("E")}
-    ${trackHTML("F")}
-    ${trackHTML("G")}
-    ${trackHTML("H")}
-    ${trackHTML("I")}
-    ${trackHTML("J")}
-    ${trackHTML("K")}
-    ${trackHTML("L")}
-    ${trackHTML("M")}
+    ${Object.keys(TRACKS).map(trackHTML).join("")}
   `;
 
   bindRunningPanel(view.querySelector("#runningSlot"));

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# ci-run [repo] — ejecuta el pipeline (.woodpecker.yaml) del repo (por defecto
+# ~/api) sobre su commit HEAD, con Woodpecker CLI y backend local.
+# El log queda en /var/lib/ci/logs/<n>.log (ver: ci-logs [n]).
+set -u
+REPO=$(cd "${1:-/home/analista/api}" && pwd) || exit 2
+SHA=$(git -C "$REPO" rev-parse HEAD) || { echo "ci-run: $REPO no es un repo git con commits"; exit 2; }
+git -C "$REPO" diff --quiet HEAD 2>/dev/null \
+  || echo "ci-run: aviso: hay cambios sin commit en $REPO; el pipeline usa el commit HEAD."
+mkdir -p /var/lib/ci/logs
+exec 9>/var/lib/ci/.lock; flock 9
+N=$(( $(cat /var/lib/ci/last 2>/dev/null || echo 0) + 1 )); echo "$N" > /var/lib/ci/last
+LOG=/var/lib/ci/logs/$N.log
+T=$(mktemp -d)
+T0=$(date +%s)
+git -C "$REPO" show HEAD:.woodpecker.yaml > "$T/pipeline.yaml" 2>/dev/null \
+  || { echo "ci-run: el commit no tiene .woodpecker.yaml"; exit 2; }
+{
+  echo "== Pipeline #$N · tienda/api · ${SHA:0:12} · $(date '+%F %T')"
+  WOODPECKER_DISABLE_UPDATE_CHECK=1 woodpecker-cli exec --backend-engine local --local=false \
+    --repo tienda/api --repo-clone-url "$REPO" --commit-sha "$SHA" --commit-branch main \
+    --pipeline-number "$N" --pipeline-event push "$T/pipeline.yaml" 2>&1 \
+    | grep -v -e 'version.json' -e 'new version of woodpecker'
+  echo "${PIPESTATUS[0]}" > "$T/rc"
+} 2>&1 | tee "$LOG"
+rc=$(cat "$T/rc" 2>/dev/null || echo 1)
+st=$([ "$rc" = 0 ] && echo success || echo failure)
+DUR=$(( $(date +%s) - T0 ))
+echo "== Resultado: $st en ${DUR} s" | tee -a "$LOG"
+echo "$N ${SHA:0:12} $st ${DUR}s $(date '+%F %T')" >> /var/lib/ci/historial
+echo "$DUR" > /var/lib/ci/ultima-duracion
+rm -rf "$T"
+chmod -R a+rwX /var/lib/ci 2>/dev/null
+[ "$st" = success ]
