@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# ausearch emulado para el lab 22: lee /var/log/audit/audit.log (escrito por
+# el auditctl emulado) y agrupa los registros por evento, como ausearch.
+# Opciones: -k clave, -f fichero, -c comando, -ts/-te/-i/-m (aceptadas).
+LOG=/var/log/audit/audit.log
+[ "$(id -u)" -eq 0 ] || { echo "Error opening config file (Permission denied)" >&2; exit 1; }
+K=""; FI=""; C=""; INT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -k|--key) K="$2"; shift 2;;
+    -f|--file) FI="$2"; shift 2;;
+    -c|--comm) C="$2"; shift 2;;
+    -i|--interpret) INT=1; shift;;
+    -ts|--start|-te|--end) shift; while [ $# -gt 0 ] && [[ "$1" != -* ]]; do shift; done;;
+    -m|--message|--format|-sc|-ua|-ui|-p) shift 2;;
+    *) shift;;
+  esac
+done
+[ -f $LOG ] || { echo "<no matches>" >&2; exit 1; }
+awk -v K="$K" -v FI="$FI" -v C="$C" -v INT="$INT" '
+  { if (match($0, /audit\([0-9.]+:[0-9]+\)/)) { id = substr($0, RSTART+6, RLENGTH-7) } else next
+    if (!(id in visto)) { orden[++n] = id; visto[id] = 1 }
+    txt[id] = txt[id] $0 "\n" }
+  END {
+    hay = 0
+    for (i = 1; i <= n; i++) {
+      id = orden[i]; t = txt[id]
+      if (K != "" && index(t, "key=\"" K "\"") == 0) continue
+      if (FI != "" && index(t, "name=\"" FI "\"") == 0) continue
+      if (C != "" && index(t, "comm=\"" C "\"") == 0) continue
+      split(id, p, ":"); split(p[1], s, ".")
+      cmd = "date -d @" s[1] " \"+%a %b %e %H:%M:%S %Y\""; cmd | getline fecha; close(cmd)
+      printf "----\ntime->%s\n%s", fecha, t
+      hay = 1
+    }
+    if (!hay) { print "<no matches>" > "/dev/stderr"; exit 1 }
+  }' $LOG

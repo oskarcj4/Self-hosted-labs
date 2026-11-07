@@ -102,16 +102,38 @@ corre dentro del lab, con las imágenes precargadas en la imagen del lab).
 | 189 | Vistas previas por PR (proyecto/imagen/volumen por PR, gc) | 🟡 parseo de gc probado en local; falta Docker |
 | 190 | Feature flags (fichero en caliente, hash estable, kill switch) | 🟡 módulo de flags probado en local contra los casos del check; falta Docker |
 | 191 | Rollback con cambio de base de datos (expand/contract) | 🟡 migración y SQL de v1/v2 probados en local; falta Docker |
-| 192 | Services sin tráfico (selector, targetPort, readiness, puerto con nombre) | 🟡 escrito; falta Docker |
-| 193 | cert-manager (ClusterIssuer, dnsNames, Secret, renovación) | 🟡 escrito; falta Docker |
+| 192 | Services sin tráfico (selector, targetPort, readiness, puerto con nombre) | ✅ probado en Docker: check inicial falla, solve, check final pasa |
+| 193 | cert-manager (ClusterIssuer, dnsNames, Secret, renovación) | ✅ probado en Docker: check inicial falla, solve, check final pasa |
 
 ## Tanda 7 — labs 194–200 (normales)
-194 Kustomize · 195 StatefulSets · 196 RBAC · 197 Mantenimiento de nodos (drain/PDB) ·
-198 Jobs y CronJobs · 199 Actualizar versión de Kubernetes · 200 App of Apps
+Todos sobre k3s. El 197 levanta un segundo contenedor (`nodo2`, agente k3s
+con la misma imagen) para tener dos nodos de verdad. El 199 precarga el
+binario y las imágenes de k3s v1.32.0. El 200 reutiliza el andamiaje de
+Argo CD del 167.
 
-## Tanda 8 — labs 201–207
+| Lab | Título | Estado |
+|-----|--------|--------|
+| 194 | Kustomize (base + overlays, configMapGenerator, selector inmutable) | ✅ probado en Docker: check inicial falla, solve, check final pasa |
+| 195 | StatefulSets (headless, volumeClaimTemplates, identidad estable) | ✅ probado en Docker: check inicial falla, solve, check final pasa |
+| 196 | RBAC con mínimo privilegio (CI, app sin token, monitor de clúster) | ✅ probado en Docker: check inicial falla, solve, check final pasa |
+| 197 | Mantenimiento de nodos (drain sin --force, PDB, pod suelto; 2 nodos) | ✅ probado en Docker (2 nodos): check inicial falla, solve, check final pasa |
+| 198 | Jobs y CronJobs (Forbid, deadlines, backoffLimit, ttl, timeZone, suspend) | 🟡 ediciones de la solución probadas contra los YAML plantados; falta Docker |
+| 199 | Actualizar Kubernetes 1.31→1.32 (API eliminada, backup SQLite, sha256) | ✅ probado en Docker: check inicial falla, solve, check final pasa |
+| 200 | App of Apps (Argo CD, raíz + hijas en git, alta/baja por commit) | 🟡 escrito; falta Docker |
+
+## Tanda 8 — labs 201–207 (normales)
 201 Estado remoto (backend) · 202 Pruebas de infraestructura · 203 Ansible · 204 Logs con Loki ·
 205 Alertas con ruido · 206 Detección en ejecución (Falco, ▲) · 207 Backup de Kubernetes (Velero)
+
+El 201 y el 202 usan Terraform con el proveedor local. El 203 levanta tres
+contenedores (control, web1 y web2) con la misma imagen.
+
+| Lab | Título | Estado |
+|-----|--------|--------|
+| 201 | Estado remoto de Terraform (backend http con auth y lock, secreto rotado) | ✅ probado en Docker: check inicial falla, solve, check 7/7 |
+| 202 | Pruebas de infraestructura (terraform test, mutantes, ci/test.sh) | ✅ probado en Docker: check inicial falla, solve, check 6/6 (6 mutantes detectados) |
+| 203 | Ansible: de script a rol (idempotencia, handlers, vars por nivel, deriva) | ✅ probado en Docker: check inicial falla, solve, check 9/9 |
+| 204 | Logs con Loki (cardinalidad, tarjetas enmascaradas, multiline, LogQL) | ✅ probado en Docker: check inicial falla, solve, check 6/6 |
 
 ## Tanda 9 — labs 208–214
 208 Costos con OpenCost · 209 Plantillas reutilizables de CI (▲) · 210 Actualizaciones automáticas (Renovate, ▲) ·

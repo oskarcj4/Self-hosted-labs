@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# auditctl emulado para el lab 22.
+# Docker Desktop/WSL2 (y cualquier contenedor fuera del PID namespace inicial)
+# no puede configurar el audit del kernel: el kernel responde EPERM. Esta
+# versión acepta las mismas opciones básicas (-w -p -k, -W, -l, -D, -s) y
+# vigila los ficheros con inotify, escribiendo en /var/log/audit/audit.log con
+# el formato de auditd.
+D=/var/lib/tclab-audit
+R=$D/reglas
+mkdir -p $D /var/log/audit 2>/dev/null
+touch $R 2>/dev/null
+[ "$(id -u)" -eq 0 ] || { echo "You must be root to run this program." >&2; exit 4; }
+
+uso(){ echo "Uso (emulado): auditctl -w <fichero> [-p rwxa] [-k clave] | -W <fichero> | -l | -D | -s" >&2; exit 1; }
+[ $# -eq 0 ] && uso
+
+parar(){ # parar <fichero>: detiene el vigilante de ese fichero
+  local pf="$D/pid.$(echo -n "$1" | md5sum | cut -c1-12)"
+  # El vigilante es líder de su grupo (setsid): se mata el grupo entero (bash + inotifywait).
+  [ -f "$pf" ] && { kill -KILL -- -"$(cat "$pf")" 2>/dev/null; rm -f "$pf"; }
+}
+arrancar(){ # arrancar <fichero> <permisos> <clave>
+  local pf="$D/pid.$(echo -n "$1" | md5sum | cut -c1-12)"
+  parar "$1"
+  setsid /usr/local/sbin/tclab-audit-watch "$1" "$2" "$3" "$pf" </dev/null >/dev/null 2>&1 &
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$pf" ] && break; sleep 0.1; done
+}
+
+case "$1" in
+  -s)
+    echo "enabled 1"
+    echo "failure 1"
+    echo "pid $(cat $D/pid.* 2>/dev/null | head -1 || echo 0)"
+    echo "rate_limit 0"
+    echo "backlog_limit 8192"
+    echo "lost 0"
+    echo "backlog 0"
+    echo "# (emulado: el kernel no permite audit dentro de este contenedor; las reglas -w funcionan con inotify)"
+    exit 0;;
+  -l)
+    [ -s $R ] && cat $R || echo "No rules"
+    exit 0;;
+  -D)
+    while read -r _ f _; do parar "$f"; done < <(awk '{print $1, $2}' $R)
+    : > $R
+    echo "No rules"
+    exit 0;;
+  -e) exit 0;;
+esac
+
+W=""; P="rwxa"; K=""; BORRAR=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -w) W="$2"; shift 2;;
+    -W) W="$2"; BORRAR=1; shift 2;;
+    -p) P="$2"; shift 2;;
+    -k) K="$2"; shift 2;;
+    -F) if [[ "$2" == key=* ]]; then K="${2#key=}"; shift 2; else
+          echo "auditctl (emulado): sólo se admiten reglas de fichero (-w/-W), -l, -D y -s." >&2; exit 1; fi;;
+    -a|-A|-S|-C|-m) echo "auditctl (emulado): sólo se admiten reglas de fichero (-w/-W), -l, -D y -s." >&2; exit 1;;
+    *) uso;;
+  esac
+done
+[ -n "$W" ] || uso
+[[ "$P" =~ ^[rwxa]+$ ]] || { echo "Permission $P isn't supported" >&2; exit 1; }
+[ -e "$W" ] || [ -d "$(dirname "$W")" ] || { echo "Error: watch path $W does not exist" >&2; exit 1; }
+LINEA="-w $W -p $P${K:+ -k $K}"
+
+if [ -n "$BORRAR" ]; then
+  grep -q -- "^-w $W " $R || { echo "Error deleting rule (No such file or directory)" >&2; exit 1; }
+  grep -v -- "^-w $W " $R > $R.n; mv $R.n $R
+  parar "$W"
+  exit 0
+fi
+if grep -qxF -- "$LINEA" $R; then
+  echo "Error sending add rule data request (Rule exists)" >&2; exit 1
+fi
+grep -v -- "^-w $W " $R > $R.n; mv $R.n $R
+echo "$LINEA" >> $R
+arrancar "$W" "$P" "$K"
+exit 0

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# augenrules emulado para el lab 22: --load aplica las reglas -w de
+# /etc/audit/rules.d/*.rules con el auditctl emulado.
+[ "$(id -u)" -eq 0 ] || { echo "Only root can run this." >&2; exit 1; }
+case "$1" in
+  --load|--check|"") ;;
+  *) echo "Usage: augenrules [--check|--load]" >&2; exit 1;;
+esac
+cat /etc/audit/rules.d/*.rules 2>/dev/null | grep -E '^-w ' > /etc/audit/audit.rules.tmp || true
+mv /etc/audit/audit.rules.tmp /etc/audit/audit.rules
+[ "$1" = --check ] && { echo "Rules have changed and should be updated"; exit 0; }
+[ "$1" = --load ] || exit 0
+/usr/local/sbin/auditctl -D >/dev/null
+while read -r linea; do
+  # shellcheck disable=SC2086
+  /usr/local/sbin/auditctl $linea 2>/dev/null
+done < /etc/audit/audit.rules
+/usr/local/sbin/auditctl -l
