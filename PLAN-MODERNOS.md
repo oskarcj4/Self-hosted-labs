@@ -147,3 +147,18 @@ contenedores (control, web1 y web2) con la misma imagen.
 ## Tanda 11 — labs 222–226 (▲)
 222 Camino estándar (golden path) · 223 Servir un modelo (Ollama+FastAPI) ·
 224 RAG en producción (pgvector) · 225 Observabilidad de LLM · 226 Agente con permisos mínimos
+
+## Pista P — Discos, volúmenes y montajes · labs 205–212 (a petición del autor)
+Se intercalaron antes de la Tanda 8: **los labs 205–226 del plan que siguen pendientes pasan a 213–234** (Alertas con ruido = 213 … Agente con permisos mínimos = 234).
+Base systemd + loop/dm/md; cada lab trae `clean.sh` (libera loop, device-mapper y md en el kernel de la VM al apagar).
+
+| Lab | Tema | Estado |
+|-----|------|--------|
+| 205 | Ampliar un EBS con partición ext4 (growpart, kpartx -u, resize2fs) | ✅ probado en Docker: 3/6 → 6/6 |
+| 206 | Más espacio con LVM + XFS (pvresize, vgextend, lvextend -r) | ✅ probado en Docker: 2/6 → 6/6 |
+| 207 | /etc/fstab roto (findmnt --verify, mount -a, nofail) | ✅ probado en Docker: 1/7 → 7/7 |
+| 208 | Disco externo sin restricciones (nosuid, nodev, noexec) | ✅ probado en Docker: 2/14 → 11/11 |
+| 209 | /tmp, /var/tmp y /dev/shm sin exec (tmpfs, bind, evidencia) | ✅ probado en Docker: 1/12 → 12/12 |
+| 210 | df lleno, du vacío (montaje que oculta, lsof +L1) | ✅ probado en Docker: 3/7 → 7/7 |
+| 211 | Bóveda LUKS: rotar claves, cabecera, crypttab | ✅ probado en Docker: 1/7 → 10/10 |
+| 212 | RAID1 degradado (mdadm --add, mdadm.conf) | ✅ probado en Docker: 2/6 → 6/6 |

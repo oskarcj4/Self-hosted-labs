@@ -1,0 +1,14 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-208
+    hostname: usb-208
+    privileged: true      # systemd real + dispositivos de bloque (loop, device-mapper, md)
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7808:7681"   # terminal web (ttyd)

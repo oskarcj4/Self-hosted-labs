@@ -2,7 +2,7 @@
 "use strict";
 
 const view = document.getElementById("view");
-const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)", H: "Máquinas HTB (red / blue)", I: "Defensa del host", J: "Monitoreo, SOC y redes", K: "Hardening web", L: "En tu sistema: guías (bajo tu riesgo)", M: "DevOps: incidentes reales", N: "Mr. Robot: defensa azul", O: "DevOps / Cloud native moderno y almacenamiento" };
+const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)", H: "Máquinas HTB (red / blue)", I: "Defensa del host", J: "Monitoreo, SOC y redes", K: "Hardening web", L: "En tu sistema: guías (bajo tu riesgo)", M: "DevOps: incidentes reales", N: "Mr. Robot: defensa azul", O: "DevOps / Cloud native moderno y almacenamiento", P: "Discos, volúmenes y montajes (AWS EBS, LVM, LUKS, RAID)" };
 let STATE = { labs: [], cursos: [], filter: "all", view: "home" };
 const POLL_MS = 8000; // refresco de "labs en ejecución"
 
