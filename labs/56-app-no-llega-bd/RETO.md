@@ -6,8 +6,10 @@
 
 Anoche se migró la red interna y desde entonces `orders-app` (en `app-01`, la
 máquina donde estás) devuelve **503**. El equipo de datos jura que la BD de
-`db-01` "está arriba". Tienes el ticket en `~/ticket/INC-4120.txt`, con el
-acceso SSH a `db-01`.
+`db-01` "está arriba". Tienes el ticket en `~/ticket/INC-4120.txt`.
+
+**Acceso a `db-01`:** `ssh dba@db-01` · contraseña `Guardia-2026` (tiene `sudo`,
+pide la misma contraseña).
 
 ```
 app-01 (10.76.56.10)  ──TCP 5432──▶  db-01 (10.76.56.20)  minidb
