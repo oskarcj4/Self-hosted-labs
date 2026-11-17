@@ -29,6 +29,7 @@ import json
 import os
 import re
 import signal
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -48,6 +49,54 @@ GRACE_S = int(os.environ.get("TCLAB_DESTROY_GRACE", "60"))
 TTL_MIN = int(os.environ.get("TCLAB_TTL_MIN", "120"))
 KEEP_ON_EXIT = os.environ.get("TCLAB_KEEP_ON_EXIT") == "1"
 REAP_EVERY_S = 10
+# Registro de labs completados (SQLite, stdlib). TCLAB_DB=0 lo desactiva.
+DB_PATH = os.environ.get("TCLAB_DB", os.path.join(ROOT, "progreso.db"))
+DB_ENABLED = DB_PATH not in ("", "0")
+DB_LOCK = threading.Lock()
+
+
+def _db(sql, params=()):
+    """Ejecuta una sentencia, hace commit y cierra la conexión."""
+    with DB_LOCK:
+        cx = sqlite3.connect(DB_PATH)
+        try:
+            with cx:
+                return cx.execute(sql, params).fetchall()
+        finally:
+            cx.close()
+
+
+def db_init():
+    if not DB_ENABLED:
+        return
+    _db("""CREATE TABLE IF NOT EXISTS completados (
+             id           INTEGER PRIMARY KEY AUTOINCREMENT,
+             lab_id       TEXT NOT NULL,
+             completed_at TEXT NOT NULL)""")
+
+
+def db_record_completion(lab_id):
+    """INSERT de un lab completado (Validar OK) con la hora local."""
+    if not DB_ENABLED:
+        return
+    ts = datetime.now().astimezone().isoformat(timespec="seconds")
+    try:
+        _db("INSERT INTO completados (lab_id, completed_at) VALUES (?, ?)",
+            (lab_id, ts))
+    except sqlite3.Error as e:
+        sys.stderr.write(f"  [progreso] no pude guardar el lab {lab_id}: {e}\n")
+
+
+def db_completions():
+    """{lab_id: {"count": n, "last": iso}} para pintar en la web."""
+    if not DB_ENABLED or not os.path.exists(DB_PATH):
+        return {}
+    try:
+        rows = _db("SELECT lab_id, COUNT(*), MAX(completed_at) "
+                   "FROM completados GROUP BY lab_id")
+    except sqlite3.Error:
+        return {}
+    return {r[0]: {"count": r[1], "last": r[2]} for r in rows}
 
 # Registro de labs. Única fuente de verdad de metadatos; el contenido (RETO.md,
 # SOLUCION.md) se lee del disco. 'track': A = detección/respuesta, B = hardening,
@@ -1046,6 +1095,7 @@ def cursos_payload():
 def labs_payload():
     out = []
     running = set(running_labs())
+    done = db_completions()
     for lab_id, name, track, diff, cats, desc, skills in LABS:
         out.append({
             "id": lab_id,
@@ -1064,6 +1114,7 @@ def labs_payload():
             "ttydPort": TTYD_BASE + int(lab_id),
             "redCapable": red_capable(lab_id),
             "mode": MODE.get(lab_id),
+            "completed": done.get(lab_id),  # None o {"count", "last"}
         })
     return out
 
@@ -1249,6 +1300,7 @@ class Handler(BaseHTTPRequestHandler):
             code, out = dc(lab_id, "exec", "-T", "lab", "bash",
                            "/opt/lab/check.sh", timeout=180)
             if code == 0:
+                db_record_completion(lab_id)
                 schedule_destroy(lab_id)
         else:
             with LOCK:
@@ -1318,6 +1370,7 @@ def main():
             pass
     if not os.path.isdir(WEB_DIR):
         print(f"[!] No existe {WEB_DIR}", file=sys.stderr)
+    db_init()
     httpd = LabServer(("127.0.0.1", PORT), Handler)
     httpd.daemon_threads = True
     # SIGTERM (kill) y, en Windows, cerrar la consola (SIGBREAK) siguen el
@@ -1335,6 +1388,7 @@ def main():
     ttl = f"{TTL_MIN} min" if TTL_MIN > 0 else "sin límite"
     print(f"Autodestrucción: al resolver (+{GRACE_S}s), TTL {ttl}, al salir"
           + (" [desactivada al salir: TCLAB_KEEP_ON_EXIT=1]" if KEEP_ON_EXIT else ""))
+    print("Progreso: " + (DB_PATH if DB_ENABLED else "desactivado (TCLAB_DB=0)"))
     print("Ctrl+C para salir.")
     try:
         httpd.serve_forever()
