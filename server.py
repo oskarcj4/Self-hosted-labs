@@ -73,6 +73,11 @@ def db_init():
              id           INTEGER PRIMARY KEY AUTOINCREMENT,
              lab_id       TEXT NOT NULL,
              completed_at TEXT NOT NULL)""")
+    # Bloc de notas del alumno: una fila por lab, se autoguarda desde la web.
+    _db("""CREATE TABLE IF NOT EXISTS notas (
+             lab_id     TEXT PRIMARY KEY,
+             texto      TEXT NOT NULL,
+             updated_at TEXT NOT NULL)""")
 
 
 def db_record_completion(lab_id):
@@ -97,6 +102,45 @@ def db_completions():
     except sqlite3.Error:
         return {}
     return {r[0]: {"count": r[1], "last": r[2]} for r in rows}
+
+
+NOTE_MAX = 200_000  # caracteres por lab
+
+
+def db_note(lab_id):
+    """{"text", "updatedAt"} de la nota de un lab ("" si no hay)."""
+    if not DB_ENABLED or not os.path.exists(DB_PATH):
+        return {"text": "", "updatedAt": None}
+    try:
+        rows = _db("SELECT texto, updated_at FROM notas WHERE lab_id = ?",
+                   (lab_id,))
+    except sqlite3.Error:
+        return {"text": "", "updatedAt": None}
+    if not rows:
+        return {"text": "", "updatedAt": None}
+    return {"text": rows[0][0], "updatedAt": rows[0][1]}
+
+
+def db_save_note(lab_id, text):
+    """UPSERT de la nota; texto vacío borra la fila. Devuelve la hora o None."""
+    if not text.strip():
+        _db("DELETE FROM notas WHERE lab_id = ?", (lab_id,))
+        return None
+    ts = datetime.now().astimezone().isoformat(timespec="seconds")
+    _db("INSERT INTO notas (lab_id, texto, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(lab_id) DO UPDATE SET texto = excluded.texto, "
+        "updated_at = excluded.updated_at", (lab_id, text, ts))
+    return ts
+
+
+def db_noted_labs():
+    """Conjunto de labs con nota, para marcarlos en las tarjetas."""
+    if not DB_ENABLED or not os.path.exists(DB_PATH):
+        return set()
+    try:
+        return {r[0] for r in _db("SELECT lab_id FROM notas")}
+    except sqlite3.Error:
+        return set()
 
 # Registro de labs. Única fuente de verdad de metadatos; el contenido (RETO.md,
 # SOLUCION.md) se lee del disco. 'track': A = detección/respuesta, B = hardening,
@@ -1121,6 +1165,7 @@ def labs_payload():
     out = []
     running = set(running_labs())
     done = db_completions()
+    noted = db_noted_labs()
     for lab_id, name, track, diff, cats, desc, skills in LABS:
         out.append({
             "id": lab_id,
@@ -1140,6 +1185,7 @@ def labs_payload():
             "redCapable": red_capable(lab_id),
             "mode": MODE.get(lab_id),
             "completed": done.get(lab_id),  # None o {"count", "last"}
+            "hasNotes": lab_id in noted,
         })
     return out
 
@@ -1195,6 +1241,31 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _save_note(self, lab_id):
+        # Vale para labs resueltos o no, con o sin contenedor.
+        if lab_id not in LAB_BY_ID:
+            return self._json({"error": "lab inexistente"}, 404)
+        if not DB_ENABLED:
+            return self._json({"ok": False, "error": "Persistencia desactivada "
+                               "(TCLAB_DB=0)."}, 409)
+        n = int(self.headers.get("Content-Length", 0) or 0)
+        if n > NOTE_MAX * 4 + 1024:
+            return self._json({"ok": False, "error": "Nota demasiado larga."}, 413)
+        try:
+            body = json.loads(self.rfile.read(n) or b"{}")
+        except ValueError:
+            return self._json({"ok": False, "error": "JSON inválido."}, 400)
+        text = body.get("text", "") if isinstance(body, dict) else ""
+        if not isinstance(text, str):
+            return self._json({"ok": False, "error": "text debe ser texto."}, 400)
+        if len(text) > NOTE_MAX:
+            return self._json({"ok": False, "error": "Nota demasiado larga."}, 413)
+        try:
+            ts = db_save_note(lab_id, text)
+        except sqlite3.Error as e:
+            return self._json({"ok": False, "error": "SQLite: %s" % e}, 500)
+        return self._json({"ok": True, "updatedAt": ts})
+
     # ---- routing ----
     def do_GET(self):
         path = urlparse(self.path).path
@@ -1222,6 +1293,11 @@ class Handler(BaseHTTPRequestHandler):
             if txt is None:
                 return self._json({"error": "no disponible"}, 404)
             return self._json({"markdown": txt})
+        m = re.match(r"^/api/labs/(\d{2,3})/notes$", path)
+        if m:
+            if m.group(1) not in LAB_BY_ID:
+                return self._json({"error": "lab inexistente"}, 404)
+            return self._json({**db_note(m.group(1)), "enabled": DB_ENABLED})
         m = re.match(r"^/api/labs/(\d{2,3})/status$", path)
         if m:
             lab_id = m.group(1)
@@ -1249,6 +1325,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         url = urlparse(self.path)
         path = url.path
+        m = re.match(r"^/api/labs/(\d{2,3})/notes$", path)
+        if m:
+            return self._save_note(m.group(1))
         m = re.match(r"^/api/labs/(\d{2,3})/(start|stop|reset|check|keep|flag)$",
                      path)
         if not m:
