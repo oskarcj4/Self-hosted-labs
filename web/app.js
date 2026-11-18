@@ -142,7 +142,7 @@ const liveBadge = '<span class="badge live"><span class="dot"></span>activo</spa
 function cardHTML(l) {
   return `<article class="card" tabindex="0" role="button" data-id="${l.id}" aria-label="Abrir lab ${l.id}: ${esc(l.name)}">
     <div class="card__top">
-      <span class="card__id">${l.local ? "GUÍA" : "LAB"} ${l.id}${l.completed ? ` <span title="Completado ${l.completed.count}× · último ${esc(l.completed.last)}">✓</span>` : ""}</span>
+      <span class="card__id">${l.local ? "GUÍA" : "LAB"} ${l.id}${l.completed ? ` <span title="Completado ${l.completed.count}× · último ${esc(l.completed.last)}">✓</span>` : ""}${l.hasNotes ? ` <span title="Tiene notas">✎</span>` : ""}</span>
       <span class="card__state">${l.running ? liveBadge : diffDots(l.difficulty)}</span>
     </div>
     <div class="card__cats">${catsHTML(l)}</div>
@@ -428,6 +428,7 @@ function route() {
 
 /* Resalta en el nav "Cursos" o el filtro de pista activo. */
 function setNav(section) {
+  Notes.detach();
   view.classList.remove("container--wide"); // solo la pestaña Terminal usa el ancho completo
   document.querySelectorAll(".menu__item[data-filter]").forEach((x) =>
     x.setAttribute("aria-checked", x.dataset.filter === STATE.filter));
@@ -572,6 +573,7 @@ function renderLocal(l) {
     .then((d) => { view.querySelector(sel).innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
     .catch(() => { view.querySelector(sel).textContent = "No disponible."; });
   load("reto", "#mdReto"); load("guia", "#mdGuia"); load("solucion", "#mdSol");
+  Notes.attach(l);
 }
 
 async function renderDetail(id) {
@@ -731,6 +733,7 @@ async function renderDetail(id) {
   renderOthersBanner();
   renderLifeBanner();
   refreshStatus(l);
+  Notes.attach(l);
 }
 
 function switchTab(panel) {
@@ -869,6 +872,170 @@ function toggleBrief(show) {
   ws.classList.toggle("workspace--nobrief", !show);
   try { localStorage.setItem("tc-brief", show ? "shown" : "hidden"); } catch {}
 }
+
+/* ---------- bloc de notas por lab ----------
+   Panel flotante (abajo a la derecha) con una nota por lab, resuelto o no.
+   Se autoguarda en SQLite (tabla notas) unos instantes después de dejar de
+   escribir, al salir del lab y al cerrar la pestaña. Alt+N lo abre/cierra. */
+const Notes = (() => {
+  const DEBOUNCE_MS = 700;
+  let lab = null;          // lab mostrado (null fuera del detalle)
+  let saved = "";          // último texto confirmado por el backend
+  let timer = null;
+  let inflight = Promise.resolve();
+  let enabled = true;
+  let fab, panel, ta, preview, statusEl, titleEl, viewBtn;
+
+  const pref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+  const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
+
+  function build() {
+    fab = document.createElement("button");
+    fab.className = "notes-fab";
+    fab.hidden = true;
+    fab.title = "Notas del lab (Alt+N)";
+    fab.setAttribute("aria-controls", "notesPanel");
+    fab.setAttribute("aria-expanded", "false");
+    fab.innerHTML = `✎ Notas<span class="notes-fab__dot" hidden></span>`;
+    fab.addEventListener("click", () => toggle());
+
+    panel = document.createElement("aside");
+    panel.className = "notes";
+    panel.id = "notesPanel";
+    panel.hidden = true;
+    panel.setAttribute("aria-label", "Bloc de notas del lab");
+    panel.innerHTML = `
+      <div class="notes__head">
+        <span class="notes__title"></span>
+        <button class="linkbtn" data-notes-view title="Alternar edición / vista Markdown">Vista</button>
+        <button class="linkbtn" data-notes-close title="Ocultar (Alt+N)" aria-label="Ocultar notas">✕</button>
+      </div>
+      <textarea class="notes__text" spellcheck="false" aria-label="Notas"></textarea>
+      <div class="md notes__preview" hidden></div>
+      <div class="notes__foot"><span class="notes__status" role="status"></span><span class="notes__hint">Autoguardado · Alt+N</span></div>`;
+    ta = panel.querySelector("textarea");
+    ta.placeholder = "Apunta qué hace cada comando, por qué funciona, lo que te costó…\n\n"
+      + "Admite Markdown: `código`, bloques ```, - listas, ## títulos.";
+    preview = panel.querySelector(".notes__preview");
+    statusEl = panel.querySelector(".notes__status");
+    titleEl = panel.querySelector(".notes__title");
+    viewBtn = panel.querySelector("[data-notes-view]");
+    panel.querySelector("[data-notes-close]").addEventListener("click", () => toggle(false));
+    viewBtn.addEventListener("click", () => setPreview(preview.hidden));
+
+    ta.addEventListener("input", () => {
+      status("Sin guardar…");
+      clearTimeout(timer);
+      timer = setTimeout(save, DEBOUNCE_MS);
+    });
+    ta.addEventListener("blur", () => { if (timer) save(); });
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.altKey) {   // sangría en bloques de código
+        e.preventDefault();
+        ta.setRangeText("  ", ta.selectionStart, ta.selectionEnd, "end");
+        ta.dispatchEvent(new Event("input"));
+      } else if (e.key === "Escape") { toggle(false); fab.focus(); }
+    });
+
+    // Tamaño elegido con el tirador: se recuerda entre labs y recargas.
+    const size = pref("tc-notes-size", "");
+    if (/^\d+x\d+$/.test(size)) {
+      const [w, h] = size.split("x");
+      panel.style.width = w + "px"; panel.style.height = h + "px";
+    }
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => {
+        if (!panel.hidden && panel.offsetWidth) setPref("tc-notes-size", `${panel.offsetWidth}x${panel.offsetHeight}`);
+      }).observe(panel);
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (lab && e.altKey && !e.ctrlKey && !e.metaKey && e.code === "KeyN") { e.preventDefault(); toggle(); }
+    });
+    // Al cerrar o recargar, lo pendiente va por sendBeacon (un fetch se cancelaría).
+    window.addEventListener("pagehide", () => {
+      if (!lab || !enabled || ta.disabled || ta.value === saved) return;
+      navigator.sendBeacon(`/api/labs/${lab.id}/notes`,
+        new Blob([JSON.stringify({ text: ta.value })], { type: "application/json" }));
+    });
+    document.body.append(fab, panel);
+  }
+
+  function status(t, cls = "") { statusEl.textContent = t; statusEl.className = "notes__status " + cls; }
+  function markDot() { fab.querySelector(".notes-fab__dot").hidden = !(lab && lab.hasNotes); }
+  function setPreview(on) {
+    preview.hidden = !on; ta.hidden = on;
+    viewBtn.textContent = on ? "Editar" : "Vista";
+    if (on) preview.innerHTML = ta.value.trim() ? md(ta.value) : `<p class="empty">Nota vacía.</p>`;
+    else if (!panel.hidden && !ta.disabled) ta.focus({ preventScroll: true });
+  }
+
+  function toggle(show) {
+    if (!lab) return;
+    const on = show === undefined ? panel.hidden : show;
+    panel.hidden = !on;
+    fab.setAttribute("aria-expanded", String(on));
+    fab.classList.toggle("notes-fab--on", on);
+    setPref("tc-notes-open", on ? "1" : "0");
+    if (on && !ta.disabled && !ta.hidden) ta.focus({ preventScroll: true });
+    if (!on && timer) save();
+  }
+
+  function save() {
+    clearTimeout(timer); timer = null;
+    if (!lab || !enabled || ta.disabled) return inflight;
+    const target = lab, id = lab.id, text = ta.value;
+    if (text === saved) { status(saved ? "Guardado" : ""); return inflight; }
+    status("Guardando…");
+    // En cadena: dos guardados seguidos nunca llegan desordenados.
+    inflight = inflight.then(() => api(`/api/labs/${id}/notes`, "POST", { text }))
+      .then((r) => {
+        if (!r.ok) throw new Error(r.error || "error");
+        target.hasNotes = !!text.trim();
+        if (lab === target) {
+          saved = text;
+          if (ta.value === text) status(r.updatedAt ? "Guardado " + hhmm(r.updatedAt) : "Nota vacía", "ok");
+          markDot();
+        }
+      })
+      .catch((e) => { if (lab === target) status("No se pudo guardar: " + e.message, "fail"); });
+    return inflight;
+  }
+
+  async function attach(l) {
+    if (!fab) build();
+    lab = l;
+    titleEl.textContent = `Notas · ${l.local ? "GUÍA" : "LAB"} ${l.id}`;
+    fab.hidden = false; markDot();
+    ta.value = ""; saved = ""; ta.disabled = true; setPreview(false);
+    status("Cargando…");
+    toggle(pref("tc-notes-open", "0") === "1");
+    await inflight;                       // lo guardado al salir del lab anterior llega antes de leer
+    try {
+      const d = await api(`/api/labs/${l.id}/notes`);
+      if (lab !== l) return;              // se cambió de lab mientras cargaba
+      enabled = d.enabled !== false;
+      ta.value = saved = d.text || "";
+      l.hasNotes = !!saved.trim(); markDot();
+      ta.disabled = !enabled;
+      if (!enabled) status("Persistencia desactivada (TCLAB_DB=0)", "fail");
+      else status(d.updatedAt ? "Guardado " + hhmm(d.updatedAt) : "");
+      if (!panel.hidden && enabled) ta.focus({ preventScroll: true });
+    } catch (e) {
+      if (lab === l) status("No se pudo cargar la nota", "fail");
+    }
+  }
+
+  function detach() {
+    if (!lab) return;
+    if (timer || ta.value !== saved) save();
+    lab = null;
+    fab.hidden = true; panel.hidden = true;
+  }
+
+  return { attach, detach };
+})();
 
 /* Terminal abierta en otra pestaña del navegador, por lab. Mientras esa pestaña
    exista no se monta el iframe: la shell está en un solo sitio, nunca en los dos.
