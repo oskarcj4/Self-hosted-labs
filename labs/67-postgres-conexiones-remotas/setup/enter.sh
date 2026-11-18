@@ -14,4 +14,5 @@ if [ -e /run/tclab-failed ]; then
 fi
 clear 2>/dev/null
 echo "Lab 67 listo. Lee el reto con:  cat /RETO.md"
+echo "Acceso a pg-01:  ssh dba@pg-01   (contraseña: Guardia-2026)"
 exec su - analista

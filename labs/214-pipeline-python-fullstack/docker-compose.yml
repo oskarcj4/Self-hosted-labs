@@ -1,0 +1,16 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-214
+    hostname: ci-214
+    privileged: true
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7814:7681"   # terminal web (ttyd)
+      - "127.0.0.1:4214:4214"   # Gitea (web y API): http://localhost:4214
+      - "127.0.0.1:8214:8080"   # la web desplegada: http://localhost:8214

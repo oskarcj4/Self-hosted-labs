@@ -1,0 +1,16 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-215
+    hostname: ci-215
+    privileged: true
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7815:7681"   # terminal web (ttyd)
+      - "127.0.0.1:4215:4215"   # Gitea (web y API): http://localhost:4215
+      - "127.0.0.1:8215:8080"   # la web desplegada: http://localhost:8215

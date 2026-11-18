@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# ci-estado [repo] [n] — últimas ejecuciones de Actions de un repo de analista.
+# Sin repo: el del directorio actual (si es un clon) o "web".
+[ "$(id -u)" -eq 0 ] || exec sudo -n "$0" "$@"
+source /opt/lab/forja.sh
+REPO=${1:-$(basename "$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)}
+REPO=${REPO:-$(cat /opt/lab/.repo-defecto 2>/dev/null)}
+FILAS=$(forja_ejecuciones "$REPO" "${2:-8}")
+[ -n "$FILAS" ] || { echo "$REPO: sin ejecuciones (¿Actions activado? ¿runner en marcha con una etiqueta que case con runs-on?)"; exit 0; }
+echo "Ejecuciones de analista/$REPO (ci-log <nº> para ver el log):"
+while IFS='|' read -r id n st rama sha titulo; do
+  e=$st; for x in $FORJA_ESTADOS; do [ "${x%%:*}" = "$st" ] && e=${x#*:}; done
+  printf '  #%-4s %-10s %-14s %s  %s\n' "$n" "$e" "$rama" "${sha:0:8}" "${titulo:0:50}"
+done <<<"$FILAS"
+echo "Web: $GITEA_URL/analista/$REPO/actions"

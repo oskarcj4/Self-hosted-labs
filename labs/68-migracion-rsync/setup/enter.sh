@@ -14,4 +14,5 @@ if [ -e /run/tclab-failed ]; then
 fi
 clear 2>/dev/null
 echo "Lab 68 listo. Lee el reto con:  cat /RETO.md"
+echo "Acceso a old-srv:  ssh migra@old-srv   (contraseña: Migra-2026)"
 exec su - analista

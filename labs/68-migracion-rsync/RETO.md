@@ -8,6 +8,9 @@
 servidor). Alguien lo intentó la semana pasada y la copia se cortó: el destino
 tiene restos. Lee `~/ticket/MIG-6808.txt`.
 
+**Acceso a `old-srv`:** `ssh migra@old-srv` · contraseña `Migra-2026`. Allí `migra`
+sólo puede ejecutar `sudo rsync` (sin contraseña).
+
 ## Objetivos
 
 Que `/srv/media` en `new-srv` sea **idéntico** al de `old-srv`:

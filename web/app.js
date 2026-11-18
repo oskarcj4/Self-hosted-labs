@@ -2,7 +2,7 @@
 "use strict";
 
 const view = document.getElementById("view");
-const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)", H: "Máquinas HTB (red / blue)", I: "Defensa del host", J: "Monitoreo, SOC y redes", K: "Hardening web", L: "En tu sistema: guías (bajo tu riesgo)", M: "DevOps: incidentes reales", N: "Mr. Robot: defensa azul", O: "DevOps / Cloud native moderno y almacenamiento", P: "Discos, volúmenes y montajes (AWS EBS, LVM, LUKS, RAID)" };
+const TRACKS = { A: "Detección / respuesta", B: "Hardening / operaciones", C: "30 días de DevSecOps (Linux + Docker)", D: "Operaciones / SRE (producción)", E: "Defensa anti-DDoS / DoS (lado azul)", F: "Pipeline CI y runtime Docker", G: "AppSec web (red / blue)", H: "Máquinas HTB (red / blue)", I: "Defensa del host", J: "Monitoreo, SOC y redes", K: "Hardening web", L: "En tu sistema: guías (bajo tu riesgo)", M: "DevOps: incidentes reales", N: "Mr. Robot: defensa azul", O: "DevOps / Cloud native moderno y almacenamiento", P: "Discos, volúmenes y montajes (AWS EBS, LVM, LUKS, RAID)", Q: "CI/CD de extremo a extremo (Actions, Jenkins, full stack)" };
 let STATE = { labs: [], cursos: [], filter: "all", view: "home" };
 const POLL_MS = 8000; // refresco de "labs en ejecución"
 
@@ -142,7 +142,7 @@ const liveBadge = '<span class="badge live"><span class="dot"></span>activo</spa
 function cardHTML(l) {
   return `<article class="card" tabindex="0" role="button" data-id="${l.id}" aria-label="Abrir lab ${l.id}: ${esc(l.name)}">
     <div class="card__top">
-      <span class="card__id">${l.local ? "GUÍA" : "LAB"} ${l.id}</span>
+      <span class="card__id">${l.local ? "GUÍA" : "LAB"} ${l.id}${l.completed ? ` <span title="Completado ${l.completed.count}× · último ${esc(l.completed.last)}">✓</span>` : ""}</span>
       <span class="card__state">${l.running ? liveBadge : diffDots(l.difficulty)}</span>
     </div>
     <div class="card__cats">${catsHTML(l)}</div>
@@ -721,7 +721,11 @@ async function renderDetail(id) {
     if (!termVisible()) switchTab("check");
     showCheck(r.output || "(sin salida)", r.ok);
     toast(r.ok ? "¡Resuelto! 🎉" : "Aún faltan objetivos");
-    if (r.ok) { l.destroyIn = r.destroyIn; renderLifeBanner(); updateRunningUI(true); }
+    if (r.ok) {
+      const prev = l.completed || { count: 0 };
+      l.completed = { count: prev.count + 1, last: new Date().toISOString().slice(0, 19) };
+      l.destroyIn = r.destroyIn; renderLifeBanner(); updateRunningUI(true);
+    }
   }, preCheck);
 
   renderOthersBanner();

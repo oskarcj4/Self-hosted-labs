@@ -1,0 +1,17 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-218
+    hostname: jenkins-218
+    privileged: true
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7818:7681"   # terminal web (ttyd)
+      - "127.0.0.1:8218:8080"   # Jenkins: http://localhost:8218
+      - "127.0.0.1:4218:4218"   # Gitea: http://localhost:4218
+      - "127.0.0.1:9218:9080"   # la app desplegada: http://localhost:9218

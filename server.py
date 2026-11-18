@@ -29,6 +29,7 @@ import json
 import os
 import re
 import signal
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -48,6 +49,54 @@ GRACE_S = int(os.environ.get("TCLAB_DESTROY_GRACE", "60"))
 TTL_MIN = int(os.environ.get("TCLAB_TTL_MIN", "120"))
 KEEP_ON_EXIT = os.environ.get("TCLAB_KEEP_ON_EXIT") == "1"
 REAP_EVERY_S = 10
+# Registro de labs completados (SQLite, stdlib). TCLAB_DB=0 lo desactiva.
+DB_PATH = os.environ.get("TCLAB_DB", os.path.join(ROOT, "progreso.db"))
+DB_ENABLED = DB_PATH not in ("", "0")
+DB_LOCK = threading.Lock()
+
+
+def _db(sql, params=()):
+    """Ejecuta una sentencia, hace commit y cierra la conexión."""
+    with DB_LOCK:
+        cx = sqlite3.connect(DB_PATH)
+        try:
+            with cx:
+                return cx.execute(sql, params).fetchall()
+        finally:
+            cx.close()
+
+
+def db_init():
+    if not DB_ENABLED:
+        return
+    _db("""CREATE TABLE IF NOT EXISTS completados (
+             id           INTEGER PRIMARY KEY AUTOINCREMENT,
+             lab_id       TEXT NOT NULL,
+             completed_at TEXT NOT NULL)""")
+
+
+def db_record_completion(lab_id):
+    """INSERT de un lab completado (Validar OK) con la hora local."""
+    if not DB_ENABLED:
+        return
+    ts = datetime.now().astimezone().isoformat(timespec="seconds")
+    try:
+        _db("INSERT INTO completados (lab_id, completed_at) VALUES (?, ?)",
+            (lab_id, ts))
+    except sqlite3.Error as e:
+        sys.stderr.write(f"  [progreso] no pude guardar el lab {lab_id}: {e}\n")
+
+
+def db_completions():
+    """{lab_id: {"count": n, "last": iso}} para pintar en la web."""
+    if not DB_ENABLED or not os.path.exists(DB_PATH):
+        return {}
+    try:
+        rows = _db("SELECT lab_id, COUNT(*), MAX(completed_at) "
+                   "FROM completados GROUP BY lab_id")
+    except sqlite3.Error:
+        return {}
+    return {r[0]: {"count": r[1], "last": r[2]} for r in rows}
 
 # Registro de labs. Única fuente de verdad de metadatos; el contenido (RETO.md,
 # SOLUCION.md) se lee del disco. 'track': A = detección/respuesta, B = hardening,
@@ -720,6 +769,31 @@ LABS = [
     ("212", "RAID1 degradado: reemplaza un disco", "P", 3, ["SRE", "SysAdmin"],
      "Salta la alerta: el RAID1 de contabilidad perdió un disco. Diagnostica, añade el reemplazo, espera la reconstrucción y haz persistente el array.",
      ["mdadm", "RAID1", "mdstat", "--add", "mdadm.conf"]),
+    # Pista Q — CI/CD de extremo a extremo (Actions, Jenkins, full stack)
+    ("213", "Tu propio GitHub Actions: Gitea + runner", "Q", 3, ["DevOps", "DevSecOps"],
+     "Monta un servidor de CI tipo GitHub Actions en casa: activa Actions en Gitea, registra un runner sin root y arregla un workflow que despliega con un token quemado.",
+     ["Gitea Actions", "act_runner", "labels", "secrets", "deploy"]),
+    ("214", "Pipeline full stack: Python (FastAPI + Vite)", "Q", 3, ["DevOps"],
+     "Tests que se saltan solos, lint ausente, frontend sin construir y despliegue desde cualquier rama. Deja el pipeline de FastAPI + Vite + PostgreSQL de verdad en verde.",
+     ["pytest", "ruff", "Vite", "PostgreSQL", "releases"]),
+    ("215", "Pipeline full stack: Java (Spring Boot + Maven)", "Q", 3, ["DevOps"],
+     "Un pipeline de Spring Boot sin internet: mirror interno de Maven, versión de Java correcta, tests que no se saltan y un bug de redondeo en precios.",
+     ["Maven", "settings.xml", "Spring Boot", "JUnit", "BigDecimal"]),
+    ("216", "Pipeline full stack: PHP con despliegue atómico", "Q", 3, ["DevOps", "SRE"],
+     "El rsync en caliente borra las reservas y publica el .env. Monta releases atómicas (shared, current, opcache) y un pipeline con PHPUnit.",
+     ["Composer", "PHPUnit", "php-fpm", "opcache", "releases atómicas"]),
+    ("217", "Jenkins local bien montado", "Q", 3, ["DevOps", "DevSecOps"],
+     "Un Jenkins como root, sin login y configurado a clics. Pásalo a JCasC, quita ejecutores al controlador, conecta un agente por WebSocket y saca la contraseña del pipeline.",
+     ["Jenkins", "JCasC", "agentes", "WebSocket", "credenciales"]),
+    ("218", "Pipeline de Jenkins desde Gitea", "Q", 3, ["DevOps"],
+     "Del pipeline pegado en la web a un Jenkinsfile versionado: credencial con token, webhook de Gitea, tests en paralelo con JUnit y despliegue limpio.",
+     ["Jenkinsfile", "webhook", "JUnit", "parallel", "API token"]),
+    ("219", "Rolling deploy con Ansible bajo tráfico", "Q", 3, ["DevOps"],
+     "El playbook reinicia las 3 instancias a la vez y cada despliegue da 503 a todos. Con 100 peticiones/s en marcha: serial, drain en HAProxy, health checks y parar en la primera si la release viene rota.",
+     ["Ansible", "serial", "HAProxy", "health checks", "zero downtime"]),
+    ("220", "Migración de PostgreSQL en plena producción", "Q", 3, ["DevOps"],
+     "La secuencia de pedidos.id está a punto de pasar de 2^31. Pásala a bigint en 3 M filas con lecturas y escrituras continuas: expand/contract, backfill por lotes, CONCURRENTLY y 0 errores.",
+     ["PostgreSQL", "expand/contract", "backfill", "lock_timeout", "zero downtime"]),
 ]
 LAB_BY_ID = {lab[0]: lab for lab in LABS}
 
@@ -1046,6 +1120,7 @@ def cursos_payload():
 def labs_payload():
     out = []
     running = set(running_labs())
+    done = db_completions()
     for lab_id, name, track, diff, cats, desc, skills in LABS:
         out.append({
             "id": lab_id,
@@ -1064,6 +1139,7 @@ def labs_payload():
             "ttydPort": TTYD_BASE + int(lab_id),
             "redCapable": red_capable(lab_id),
             "mode": MODE.get(lab_id),
+            "completed": done.get(lab_id),  # None o {"count", "last"}
         })
     return out
 
@@ -1249,6 +1325,7 @@ class Handler(BaseHTTPRequestHandler):
             code, out = dc(lab_id, "exec", "-T", "lab", "bash",
                            "/opt/lab/check.sh", timeout=180)
             if code == 0:
+                db_record_completion(lab_id)
                 schedule_destroy(lab_id)
         else:
             with LOCK:
@@ -1318,6 +1395,7 @@ def main():
             pass
     if not os.path.isdir(WEB_DIR):
         print(f"[!] No existe {WEB_DIR}", file=sys.stderr)
+    db_init()
     httpd = LabServer(("127.0.0.1", PORT), Handler)
     httpd.daemon_threads = True
     # SIGTERM (kill) y, en Windows, cerrar la consola (SIGBREAK) siguen el
@@ -1335,6 +1413,7 @@ def main():
     ttl = f"{TTL_MIN} min" if TTL_MIN > 0 else "sin límite"
     print(f"Autodestrucción: al resolver (+{GRACE_S}s), TTL {ttl}, al salir"
           + (" [desactivada al salir: TCLAB_KEEP_ON_EXIT=1]" if KEEP_ON_EXIT else ""))
+    print("Progreso: " + (DB_PATH if DB_ENABLED else "desactivado (TCLAB_DB=0)"))
     print("Ctrl+C para salir.")
     try:
         httpd.serve_forever()
