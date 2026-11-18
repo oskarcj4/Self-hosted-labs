@@ -1,0 +1,25 @@
+{
+    "name": "empresa/reservas",
+    "description": "Reservas de salas",
+    "type": "project",
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5",
+        "phpstan/phpstan": "^1.12"
+    },
+    "autoload": {
+        "psr-4": {
+            "Reservas\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Reservas\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

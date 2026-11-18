@@ -1,0 +1,16 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-220
+    hostname: prod-220
+    privileged: true
+    cgroup: host
+    shm_size: 256m            # PostgreSQL usa /dev/shm para workers paralelos (64 MB por defecto no basta)
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7820:7681"   # terminal web (ttyd)
+      - "127.0.0.1:8220:9090"   # panel de tráfico

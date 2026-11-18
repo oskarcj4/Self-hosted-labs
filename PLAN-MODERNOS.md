@@ -162,3 +162,18 @@ Base systemd + loop/dm/md; cada lab trae `clean.sh` (libera loop, device-mapper 
 | 210 | df lleno, du vacío (montaje que oculta, lsof +L1) | ✅ probado en Docker: 3/7 → 7/7 |
 | 211 | Bóveda LUKS: rotar claves, cabecera, crypttab | ✅ probado en Docker: 1/7 → 10/10 |
 | 212 | RAID1 degradado (mdadm --add, mdadm.conf) | ✅ probado en Docker: 2/6 → 6/6 |
+
+## Pista Q — CI/CD de extremo a extremo · labs 213–220 (a petición del autor)
+Se intercalaron después de la pista P: **los labs del plan que siguen pendientes pasan de 213–234 a 221–242** (Alertas con ruido = 221 … Agente con permisos mínimos = 242).
+Base común: Debian 12 + systemd + Gitea 1.22.6 + act_runner 0.2.11 (modo host, label `self-hosted:host`) + Node 20, sin internet en tiempo de ejecución (DNS cortado; espejos internos de pip, npm, Maven y Composer). Jenkins: LTS 2.580.2 sobre Temurin 21 con plugins precargados.
+
+| Lab | Tema | Estado |
+|-----|------|--------|
+| 213 | Tu propio GitHub Actions (Gitea Actions, act_runner sin root, labels, secrets) | ✅ probado en Docker: 0/9 → 9/9 |
+| 214 | Pipeline full stack Python (FastAPI + Vite + PostgreSQL, pytest, ruff) | ✅ probado en Docker: 2/8 → 8/8 |
+| 215 | Pipeline full stack Java (Spring Boot, mirror Maven, JUnit, BigDecimal) | ✅ probado en Docker: 0/8 → 8/8 |
+| 216 | Pipeline full stack PHP (Composer, PHPUnit, releases atómicas, opcache) | ✅ probado en Docker: 2/13 → 13/13 |
+| 217 | Jenkins local bien montado (no root, JCasC, agente WebSocket, credenciales) | ✅ probado en Docker: 0/9 → 9/9 |
+| 218 | Pipeline de Jenkins desde Gitea (Jenkinsfile, webhook, JUnit, parallel) | ✅ probado en Docker: 1/8 → 8/8 |
+| 219 | Rolling deploy con Ansible bajo tráfico real (serial, drain HAProxy, health checks, release rota) | ✅ probado en Docker: 0/7 → 7/7 |
+| 220 | Migración de PostgreSQL en plena producción (int→bigint, expand/contract, backfill, lock_timeout) | ✅ probado en Docker: 4/7 → 7/7 (ALTER TYPE ingenuo: 6/7) |

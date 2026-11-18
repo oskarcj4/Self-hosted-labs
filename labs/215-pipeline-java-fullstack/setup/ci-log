@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# ci-log [nº] [repo] — log de una ejecución de Actions (por defecto, la última).
+[ "$(id -u)" -eq 0 ] || exec sudo -n "$0" "$@"
+source /opt/lab/forja.sh
+REPO=${2:-$(basename "$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)}
+REPO=${REPO:-$(cat /opt/lab/.repo-defecto 2>/dev/null)}
+DB=$GITEA_WORK/data/gitea.db
+COND="1"; [ -n "${1:-}" ] && COND="r.\"index\" = ${1//[^0-9]/}"
+sqlite3 -cmd '.timeout 5000' -separator '|' $DB "
+  SELECT j.name, t.log_filename, t.status FROM action_task t
+  JOIN action_run_job j ON j.id = t.job_id
+  JOIN action_run r ON r.id = j.run_id
+  JOIN repository p ON p.id = r.repo_id
+  WHERE p.lower_name = lower('$REPO') AND r.id = (
+    SELECT r.id FROM action_run r JOIN repository p ON p.id = r.repo_id
+    WHERE p.lower_name = lower('$REPO') AND $COND ORDER BY r.id DESC LIMIT 1)
+  ORDER BY t.id;" | while IFS='|' read -r job f st; do
+  echo "===== job: $job"
+  if [ -f "$GITEA_WORK/data/actions_log/$f" ]; then
+    sed -E 's/^[0-9T:.-]+Z //' "$GITEA_WORK/data/actions_log/$f"
+  else
+    echo "(sin log todavía: el job no ha empezado o sigue en cola)"
+  fi
+done

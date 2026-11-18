@@ -244,6 +244,14 @@ implementar uno, muévelo a su pista con número de lab.
 | D10 | Ansible no idempotente | --check --diff, handlers, Molecule | planeado |
 | D11 | ArgoCD fuera de sincronía (priv.) | GitOps, self-heal, argocd app diff | planeado |
 | D12 | NetworkPolicies (priv.) | Negar por defecto entre namespaces, Calico | planeado |
+| Q1 | Tu propio GitHub Actions | Gitea Actions, act_runner sin root, labels, secrets | ✅ lab 213 |
+| Q2 | Pipeline full stack Python | FastAPI + Vite + PostgreSQL, pytest, ruff, releases | ✅ lab 214 |
+| Q3 | Pipeline full stack Java | Spring Boot, mirror Maven offline, JUnit, BigDecimal | ✅ lab 215 |
+| Q4 | Pipeline full stack PHP | Composer, PHPUnit, releases atómicas, shared/, opcache | ✅ lab 216 |
+| Q5 | Jenkins local bien montado | no root, JCasC, 0 ejecutores, agente WebSocket, credenciales | ✅ lab 217 |
+| Q6 | Pipeline de Jenkins desde Gitea | Jenkinsfile, webhook con API token, parallel, JUnit | ✅ lab 218 |
+| Q7 | Rolling deploy con Ansible bajo tráfico | serial: 1, drain en HAProxy, health checks, release rota que se para | ✅ lab 219 |
+| Q8 | Migración de PostgreSQL en plena producción | int→bigint con expand/contract, backfill por lotes, CONCURRENTLY, lock_timeout | ✅ lab 220 |
 
 ## En contenedor: Mr. Robot
 

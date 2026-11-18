@@ -1,0 +1,16 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: tc-lab-213
+    hostname: forja-213
+    privileged: true
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    stop_signal: SIGRTMIN+3
+    ports:
+      - "127.0.0.1:7813:7681"   # terminal web (ttyd)
+      - "127.0.0.1:4213:4213"   # Gitea (web y API): http://localhost:4213
+      - "127.0.0.1:8213:8080"   # la web desplegada: http://localhost:8213
