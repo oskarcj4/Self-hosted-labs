@@ -72,7 +72,12 @@ def db_init():
     _db("""CREATE TABLE IF NOT EXISTS completados (
              id           INTEGER PRIMARY KEY AUTOINCREMENT,
              lab_id       TEXT NOT NULL,
-             completed_at TEXT NOT NULL)""")
+             completed_at TEXT NOT NULL,
+             origen       TEXT NOT NULL DEFAULT 'web')""")
+    # Bases creadas antes de la columna 'origen': se añade sin perder filas.
+    cols = {r[1] for r in _db("PRAGMA table_info(completados)")}
+    if "origen" not in cols:
+        _db("ALTER TABLE completados ADD COLUMN origen TEXT NOT NULL DEFAULT 'web'")
     # Bloc de notas del alumno: una fila por lab, se autoguarda desde la web.
     _db("""CREATE TABLE IF NOT EXISTS notas (
              lab_id     TEXT PRIMARY KEY,
@@ -80,16 +85,51 @@ def db_init():
              updated_at TEXT NOT NULL)""")
 
 
-def db_record_completion(lab_id):
-    """INSERT de un lab completado (Validar OK) con la hora local."""
+# Cómo se resolvió: 'web' (botón Validar), 'terminal' (check.sh desde la
+# terminal, lo detecta el reaper por la marca), 'red' (todas las banderas
+# entregadas), 'manual' (guía sin contenedor marcada a mano).
+RECORDED = set()  # labs ya registrados en la vida actual de su contenedor
+RECORDED_LOCK = threading.Lock()
+
+
+def db_record_completion(lab_id, origen="web"):
+    """INSERT de un lab completado con la hora local. Devuelve la hora o None."""
+    with RECORDED_LOCK:
+        RECORDED.add(lab_id)
     if not DB_ENABLED:
-        return
-    ts = datetime.now().astimezone().isoformat(timespec="seconds")
+        return None
+    now = datetime.now().astimezone()
+    ts = now.isoformat(timespec="seconds")
     try:
-        _db("INSERT INTO completados (lab_id, completed_at) VALUES (?, ?)",
-            (lab_id, ts))
+        # lab.sh y el reaper del servidor pueden ver la misma resolución (y un
+        # doble clic en Validar también): una sola fila por lab cada 2 minutos.
+        last = _db("SELECT MAX(completed_at) FROM completados WHERE lab_id = ?",
+                   (lab_id,))[0][0]
+        if last:
+            try:
+                if (now - datetime.fromisoformat(last)).total_seconds() < 120:
+                    return last
+            except ValueError:
+                pass
+        _db("INSERT INTO completados (lab_id, completed_at, origen) "
+            "VALUES (?, ?, ?)", (lab_id, ts, origen))
     except sqlite3.Error as e:
         sys.stderr.write(f"  [progreso] no pude guardar el lab {lab_id}: {e}\n")
+        return None
+    sys.stderr.write(f"  [progreso] lab {lab_id} completado ({origen})\n")
+    return ts
+
+
+def db_history(limit=1000):
+    """Historial de completados, del más reciente al más antiguo."""
+    if not DB_ENABLED or not os.path.exists(DB_PATH):
+        return []
+    try:
+        rows = _db("SELECT lab_id, completed_at, origen FROM completados "
+                   "ORDER BY completed_at DESC, id DESC LIMIT ?", (limit,))
+    except sqlite3.Error:
+        return []
+    return [{"id": r[0], "at": r[1], "origen": r[2]} for r in rows]
 
 
 def db_completions():
@@ -1042,6 +1082,8 @@ def destroy(lab_id, reason):
             PENDING.pop(lab_id, None)
             KEPT.discard(lab_id)
             STARTED.pop(lab_id, None)
+        with RECORDED_LOCK:
+            RECORDED.discard(lab_id)
 
 
 def schedule_destroy(lab_id):
@@ -1071,6 +1113,10 @@ def reap_once():
             continue
         if deadline is None and not kept and is_solved(lab_id):
             log(f"lab {lab_id}: resuelto desde la terminal, destrucción en {GRACE_S}s")
+            with RECORDED_LOCK:
+                ya = lab_id in RECORDED
+            if not ya:  # Validar en la web ya lo registró
+                db_record_completion(lab_id, "terminal")
             schedule_destroy(lab_id)
         if t0 is None:
             t0 = started_at(lab_id)
@@ -1266,6 +1312,23 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "error": "SQLite: %s" % e}, 500)
         return self._json({"ok": True, "updatedAt": ts})
 
+    def _complete_local(self, lab_id):
+        """Guías sin contenedor: no hay check.sh que validar desde aquí, así
+        que el alumno las marca a mano cuando su verificación local pasa."""
+        if lab_dir(lab_id) is None:
+            return self._json({"error": "lab inexistente"}, 404)
+        if compose_file(lab_id) is not None:
+            return self._json({"ok": False, "error": "Este lab se valida con "
+                               "check.sh, no a mano."}, 400)
+        if not DB_ENABLED:
+            return self._json({"ok": False, "error": "Persistencia desactivada "
+                               "(TCLAB_DB=0)."}, 409)
+        ts = db_record_completion(lab_id, "manual")
+        if ts is None:
+            return self._json({"ok": False, "error": "No pude guardar."}, 500)
+        return self._json({"ok": True, "at": ts,
+                           "completed": db_completions().get(lab_id)})
+
     # ---- routing ----
     def do_GET(self):
         path = urlparse(self.path).path
@@ -1279,6 +1342,8 @@ class Handler(BaseHTTPRequestHandler):
                                "lifecycle": {i: lifecycle(i) for i in ids}})
         if path == "/api/cursos":
             return self._json({"cursos": cursos_payload()})
+        if path == "/api/progreso":
+            return self._json({"enabled": DB_ENABLED, "history": db_history()})
         m = re.match(r"^/api/cursos/(\d{2})$", path)
         if m:
             cp = curso_path(m.group(1))
@@ -1328,6 +1393,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^/api/labs/(\d{2,3})/notes$", path)
         if m:
             return self._save_note(m.group(1))
+        m = re.match(r"^/api/labs/(\d{2,3})/complete$", path)
+        if m:
+            return self._complete_local(m.group(1))
         m = re.match(r"^/api/labs/(\d{2,3})/(start|stop|reset|check|keep|flag)$",
                      path)
         if not m:
@@ -1374,6 +1442,7 @@ class Handler(BaseHTTPRequestHandler):
                 remaining = sorted(set(flags) - cap)
             solved = correct and not remaining
             if solved:
+                db_record_completion(lab_id, "red")
                 schedule_destroy(lab_id)
             return self._json({
                 "ok": correct, "kind": kind, "correct": correct,
@@ -1404,7 +1473,7 @@ class Handler(BaseHTTPRequestHandler):
             code, out = dc(lab_id, "exec", "-T", "lab", "bash",
                            "/opt/lab/check.sh", timeout=180)
             if code == 0:
-                db_record_completion(lab_id)
+                db_record_completion(lab_id, "web")
                 schedule_destroy(lab_id)
         else:
             with LOCK:
@@ -1413,6 +1482,8 @@ class Handler(BaseHTTPRequestHandler):
                 KEPT.discard(lab_id)
                 STARTED.pop(lab_id, None)
                 CAPTURED.pop(lab_id, None)
+            with RECORDED_LOCK:  # escenario nuevo: se puede volver a completar
+                RECORDED.discard(lab_id)
             port = TTYD_BASE + int(lab_id)
 
             def _up(force=()):
@@ -1505,5 +1576,20 @@ def main():
         httpd.server_close()
 
 
+def record_cli(argv):
+    """`server.py --record NN [origen]`: lo usa lab.sh para registrar un lab
+    resuelto desde la línea de comandos (sin el servidor web)."""
+    if len(argv) < 1 or argv[0] not in LAB_BY_ID:
+        print("uso: server.py --record NN [terminal|manual]", file=sys.stderr)
+        return 2
+    origen = argv[1] if len(argv) > 1 and argv[1] in ("terminal", "manual") else "terminal"
+    if not DB_ENABLED:
+        return 0
+    db_init()
+    return 0 if db_record_completion(argv[0], origen) else 1
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--record":
+        sys.exit(record_cli(sys.argv[2:]))
     main()

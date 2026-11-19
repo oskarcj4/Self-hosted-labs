@@ -421,6 +421,7 @@ function route() {
   const h = location.hash;
   let m;
   if (h === "#cursos") renderCourses();
+  else if (h === "#progreso") renderProgress();
   else if ((m = h.match(/^#curso\/(\d{2})$/))) renderCourse(m[1]);
   else if ((m = h.match(/^#lab\/(\d{2,3})$/))) renderDetail(m[1]);
   else renderHome();
@@ -433,11 +434,92 @@ function setNav(section) {
   document.querySelectorAll(".menu__item[data-filter]").forEach((x) =>
     x.setAttribute("aria-checked", x.dataset.filter === STATE.filter));
   const btn = document.getElementById("trackBtn");
-  btn.setAttribute("aria-pressed", section !== "cursos");
+  btn.setAttribute("aria-pressed", section === "home");
   document.getElementById("trackCurrent").textContent =
     STATE.filter === "all" ? "Todos" : TRACKS[STATE.filter].split(" (")[0];
-  const c = document.querySelector('.chip[data-route="cursos"]');
-  if (c) c.setAttribute("aria-pressed", section === "cursos");
+  for (const r of ["cursos", "progreso"]) {
+    const c = document.querySelector(`.chip[data-route="${r}"]`);
+    if (c) c.setAttribute("aria-pressed", section === r);
+  }
+}
+
+/* ---------- progreso (registro SQLite de labs completados) ---------- */
+const ORIGEN = { web: "Validar (web)", terminal: "check.sh (terminal)", red: "Banderas (red)", manual: "Marcada a mano" };
+
+/* "2026-11-18T18:12:37-06:00" -> "18/11/2026 18:12" */
+function fmtDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || "");
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : (iso || "");
+}
+
+async function renderProgress() {
+  STATE.view = "progreso";
+  setHash("#progreso");
+  setNav("progreso");
+  window.scrollTo(0, 0);
+  view.innerHTML = `<section class="hero"><h1>Progreso</h1><p>Cargando…</p></section>`;
+  let d;
+  try { d = await api("/api/progreso"); } catch (e) { d = null; }
+  if (STATE.view !== "progreso") return;
+  if (!d) { view.innerHTML = `<div class="empty">No se pudo leer el progreso.</div>`; return; }
+  if (!d.enabled) {
+    view.innerHTML = `<section class="hero"><h1>Progreso</h1>
+      <p>El registro está desactivado (<code>TCLAB_DB=0</code>). Arranca el servidor sin esa variable para guardar los labs resueltos en <code>progreso.db</code>.</p></section>`;
+    return;
+  }
+  const byId = Object.fromEntries(STATE.labs.map((l) => [l.id, l]));
+  // Refresca las marcas ✓ de las tarjetas con lo que dice la base de datos.
+  const agg = {};
+  for (const h of d.history) {
+    const a = (agg[h.id] ||= { count: 0, last: h.at });
+    a.count += 1;
+  }
+  STATE.labs.forEach((l) => { l.completed = agg[l.id] || null; });
+
+  const avail = STATE.labs.filter((l) => l.exists);
+  const doneIds = new Set(Object.keys(agg));
+  const nDone = avail.filter((l) => doneIds.has(l.id)).length;
+  const pct = avail.length ? Math.round((nDone / avail.length) * 100) : 0;
+
+  const tracks = Object.keys(TRACKS).map((t) => {
+    const labs = avail.filter((l) => l.track === t);
+    if (!labs.length) return "";
+    const n = labs.filter((l) => doneIds.has(l.id)).length;
+    const p = Math.round((n / labs.length) * 100);
+    return `<div class="prog-track">
+      <div class="prog-track__head"><span>${esc(TRACKS[t])}</span><span class="muted">${n} / ${labs.length}</span></div>
+      <div class="prog-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${labs.length}" aria-valuenow="${n}" aria-label="${esc(TRACKS[t])}"><span style="width:${p}%"></span></div>
+    </div>`;
+  }).join("");
+
+  const rows = d.history.map((h) => {
+    const l = byId[h.id];
+    const name = l ? esc(l.name) : '<span class="muted">(lab retirado)</span>';
+    return `<tr>
+      <td class="mono">${esc(fmtDate(h.at))}</td>
+      <td><a href="#lab/${esc(h.id)}">${l && l.local ? "GUÍA" : "LAB"} ${esc(h.id)}</a> · ${name}</td>
+      <td class="muted">${esc(ORIGEN[h.origen] || h.origen)}</td>
+    </tr>`;
+  }).join("");
+
+  view.innerHTML = `
+    <section class="hero">
+      <h1>Progreso</h1>
+      <p>Registro local de los labs que resolviste. Se guarda en <code>progreso.db</code> (SQLite) al pasar <em>Validar</em>, al ejecutar <code>check.sh</code> desde la terminal, al entregar todas las banderas en modo red, o al marcar una guía como completada.</p>
+    </section>
+    <div class="prog-summary">
+      <div class="prog-stat"><strong>${nDone}</strong><span>de ${avail.length} labs completados</span></div>
+      <div class="prog-stat"><strong>${pct}%</strong><span>del total</span></div>
+      <div class="prog-stat"><strong>${d.history.length}</strong><span>validaciones registradas</span></div>
+    </div>
+    <div class="section-label">Por pista</div>
+    <div class="prog-tracks">${tracks}</div>
+    <div class="section-label">Historial</div>
+    ${rows ? `<div class="prog-table-wrap"><table class="prog-table">
+      <thead><tr><th>Fecha</th><th>Lab</th><th>Cómo</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`
+      : '<p class="empty">Aún no hay labs completados. Resuelve uno y aparecerá aquí.</p>'}
+  `;
 }
 
 /* Aviso del detalle de un lab: "¿Dificultad? Lee 04 · … y 05 · … para mejorar." */
@@ -548,7 +630,10 @@ function renderLocal(l) {
         <div class="card__id">GUÍA ${l.id} · ${TRACKS[l.track]}</div>
         <h1 class="detail__title">${esc(l.name)}</h1>
         ${l.description ? `<p class="detail__desc">${esc(l.description)}</p>` : ""}
-        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)}</div>
+        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)} <span id="localDone" class="muted"></span></div>
+      </div>
+      <div class="detail__actions">
+        <button class="btn" id="btnLocalDone" title="Guarda la guía en tu registro de progreso">Marcar como completada</button>
       </div>
     </div>
     <div class="notice" role="note">⚠ <strong>Sin contenedor:</strong> esta guía se aplica en <strong>tu propio sistema y bajo tu propio riesgo</strong>.
@@ -564,6 +649,21 @@ function renderLocal(l) {
     <div class="panel" data-panel="sol"><div class="md" id="mdSol">Cargando…</div></div>
   `;
   view.querySelector("#back").addEventListener("click", (e) => { e.preventDefault(); renderHome(); });
+  const doneEl = view.querySelector("#localDone");
+  const paintDone = () => {
+    doneEl.textContent = l.completed ? `✓ completada ${l.completed.count}× · última ${fmtDate(l.completed.last)}` : "";
+  };
+  paintDone();
+  view.querySelector("#btnLocalDone").addEventListener("click", async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    try {
+      const r = await api(`/api/labs/${l.id}/complete`, "POST");
+      if (r.ok) { l.completed = r.completed; paintDone(); toast("Guardada en tu progreso"); }
+      else toast(r.error || "No se pudo guardar");
+    } catch (_) { toast("No se pudo guardar"); }
+    b.disabled = false;
+  });
   const tabs = [...view.querySelectorAll(".tab")];
   tabs.forEach((t) => t.addEventListener("click", () => {
     tabs.forEach((x) => x.setAttribute("aria-selected", x === t));
@@ -1193,6 +1293,7 @@ function initFilters() {
   document.addEventListener("click", (e) => { if (!menu.contains(e.target)) setOpen(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) { setOpen(false); btn.focus(); } });
   document.querySelector('.chip[data-route="cursos"]').addEventListener("click", renderCourses);
+  document.querySelector('.chip[data-route="progreso"]').addEventListener("click", renderProgress);
   // Enlaces internos (#cursos, #curso/NN, #lab/NN) y botones atrás/adelante.
   window.addEventListener("hashchange", route);
   document.querySelector(".brand").addEventListener("click", (e) => { e.preventDefault(); renderHome(); });

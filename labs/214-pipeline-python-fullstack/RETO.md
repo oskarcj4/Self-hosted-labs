@@ -39,6 +39,24 @@ cd ~/tareas && cat .github/workflows/ci.yml
 psql postgresql://ci:ci@127.0.0.1:5432/tareas_test -c 'select 1'
 ```
 
+### Probar en tu terminal antes de empujar
+
+En la terminal **no hay** `pytest` ni `ruff` instalados, ni comando `python`
+(sólo `python3`): `python -m pytest` falla tal cual. Crea un entorno virtual
+en el repo, igual que hace el pipeline. Funciona sin internet (`pip` usa el
+mirror interno `/opt/wheels`):
+
+```bash
+cd ~/tareas
+python3 -m venv .venv
+.venv/bin/pip install -r backend/requirements-dev.txt
+cd backend
+DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/tareas_test ../.venv/bin/pytest -v
+../.venv/bin/ruff check .
+```
+
+`.venv/` está en `.gitignore`: no se sube. No uses `sudo pip install`.
+
 Cuando por fin corran los tests, puede que fallen por algo que nunca se vio
 porque nunca se ejecutaron. Lee el error.
 

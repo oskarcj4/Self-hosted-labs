@@ -334,6 +334,12 @@ Datos:
   - Frontend: Vite. npm funciona sin internet (caché interna): npm ci && npm run build.
   - Despliegue: sudo /usr/local/bin/desplegar-tareas <dir> <sha> (sirve backend/static).
 
+Probar en esta terminal (aquí no hay pytest/ruff instalados ni comando "python"):
+  cd ~/tareas && python3 -m venv .venv
+  .venv/bin/pip install -r backend/requirements-dev.txt     # sin internet: mirror /opt/wheels
+  cd backend && DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/tareas_test ../.venv/bin/pytest -v
+  ../.venv/bin/ruff check .
+
 Ayudas: ci-estado, ci-log [nº], journalctl -u tareas
 Comprueba: bash /opt/lab/check.sh
 TXT

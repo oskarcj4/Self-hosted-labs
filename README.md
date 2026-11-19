@@ -81,10 +81,34 @@ Ajustes por variable de entorno:
 | `TCLAB_DESTROY_GRACE` | `60` | Segundos entre "resuelto" y la destrucción |
 | `TCLAB_TTL_MIN` | `120` | Vida máxima de un lab en minutos (`0` = sin límite) |
 | `TCLAB_KEEP_ON_EXIT` | — | `1` = no destruir los labs al cerrar el servidor |
+| `TCLAB_DB` | `progreso.db` | Ruta de la base SQLite de progreso y notas (`0` = desactivada) |
 
 > La autodestrucción la hacen `server.py` y `lab.sh`. Si levantas un lab a
 > mano con `docker compose up`, nadie lo vigila: bórralo con `./lab.sh stop NN`
 > o `./lab.sh reap`.
+
+## ✅ Tu progreso queda guardado
+
+Cada lab resuelto se registra en `progreso.db` (SQLite, junto a `server.py`,
+fuera de git) con la fecha y cómo se resolvió:
+
+| Cómo | Cuándo se registra |
+|---|---|
+| Validar (web) | El botón **Validar** pasa |
+| check.sh (terminal) | `bash /opt/lab/check.sh` pasa en la terminal del lab (lo detecta el *reaper* en ≤10 s) |
+| Banderas (red) | Entregas todas las banderas en modo red |
+| Marcada a mano | Guías sin contenedor (pista L): botón **Marcar como completada** |
+
+La pestaña **Progreso** de la web muestra cuántos labs llevas, el avance por
+pista y el historial. Las tarjetas resueltas llevan un ✓. Los labs se
+destruyen al resolverlos, pero el registro no: sobrevive a reinicios del
+servidor y de Docker. Para empezar de cero, borra `progreso.db` (también
+borra tus notas).
+
+> `./lab.sh check NN` y salir de `./lab.sh start NN` con el lab resuelto
+> también lo registran, aunque la web esté apagada (necesita Python 3 en el
+> host). Si dos caminos ven la misma resolución, sólo queda una fila: no se
+> repite un lab dentro de 2 minutos.
 
 ## 🗺️ Qué vas a practicar
 
