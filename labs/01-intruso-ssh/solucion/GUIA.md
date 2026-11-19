@@ -52,7 +52,7 @@ ls -la /dev/shm
 ```
 Busca un `source` o `.` que cargue un fichero de una ruta rara (`/dev/shm`, `/tmp`). Mira qué contiene ese fichero **antes** de borrarlo: es evidencia.
 
-Quita las líneas de la trampa del `.bashrc` y después borra el payload.
+Quita las líneas de la trampa del `.bashrc` y después borra el payload. El payload es de `root` y `/dev/shm` tiene *sticky bit* (la `t` de `drwxrwxrwt`): sólo su dueño o root lo borra, así que necesitas `sudo rm`.
 :::
 
 :::ojo Orden

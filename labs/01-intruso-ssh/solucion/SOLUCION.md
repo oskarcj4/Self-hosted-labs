@@ -39,8 +39,9 @@ shell nueva, eso ejecutaría el payload del atacante. Quítalo y borra el payloa
 # quita las líneas de la trampa
 sed -i '/actualizacion automatica del sistema/,/^# ----/d' ~/.bashrc
 sed -i '\#source /dev/shm/.update#d' ~/.bashrc
-# borra el payload
-rm -f /dev/shm/.update
+# borra el payload: es de root (lo plantó el atacante con privilegios)
+# y /dev/shm tiene sticky bit, así que tu usuario no puede borrarlo sin sudo
+sudo rm -f /dev/shm/.update
 ```
 
 (Revisa también `/etc/bash.bashrc`, `~/.bash_profile` y `~/.profile`: son los

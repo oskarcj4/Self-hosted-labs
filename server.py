@@ -78,6 +78,14 @@ def db_init():
     cols = {r[1] for r in _db("PRAGMA table_info(completados)")}
     if "origen" not in cols:
         _db("ALTER TABLE completados ADD COLUMN origen TEXT NOT NULL DEFAULT 'web'")
+    # Modo arena: una fila por partida (en_curso, superado, eliminado, abandonado).
+    _db("""CREATE TABLE IF NOT EXISTS arena (
+             id         INTEGER PRIMARY KEY AUTOINCREMENT,
+             lab_id     TEXT NOT NULL,
+             started_at TEXT NOT NULL,
+             ended_at   TEXT,
+             fails      INTEGER NOT NULL DEFAULT 0,
+             status     TEXT NOT NULL DEFAULT 'en_curso')""")
     # Bloc de notas del alumno: una fila por lab, se autoguarda desde la web.
     _db("""CREATE TABLE IF NOT EXISTS notas (
              lab_id     TEXT PRIMARY KEY,
@@ -118,6 +126,194 @@ def db_record_completion(lab_id, origen="web"):
         return None
     sys.stderr.write(f"  [progreso] lab {lab_id} completado ({origen})\n")
     return ts
+
+
+# ---------------------------------------------------------------------------
+# Modo arena: los mismos labs y contenedores, sin guía, sin solución, sin
+# pistas y con 3 intentos de Validar (al tercer fallo, fuera). Todo es lógica
+# del servidor: no hay imágenes ni contenedores nuevos.
+# ---------------------------------------------------------------------------
+ARENA_MAX_FAILS = 2                    # fallos permitidos; el siguiente elimina
+ARENA_TRIES = ARENA_MAX_FAILS + 1
+ARENA_DIR = "/root/.tclab-arena"       # dentro del contenedor, sólo root
+# Secciones del RETO.md que en arena se quitan (son ayuda, no enunciado).
+ARENA_HIDE_H2 = re.compile(r"pista|comandos que te pueden servir|reconocimiento|ayuda", re.I)
+ARENA_HIDE_BLOCKS = ("pista", "solucion", "piensa")
+ARENA_CHECKING = set()                 # labs con un Validar de arena en curso
+ARENA_STUB = """#!/usr/bin/env bash
+# Modo arena: el validador real está guardado fuera de tu alcance.
+echo "⚔  Modo arena: aquí no hay validador ni pistas."
+echo "   Valida desde la web (botón Validar). Cada fallo gasta un intento;"
+echo "   al tercero quedas fuera."
+exit 2
+"""
+
+
+ARENA_HINT_PAREN = re.compile(r"[ \t]*\((?:pista|truco)\b[^)]*\)", re.I)
+ARENA_HINT_PARA = re.compile(r"^(?:>[ \t]*)?(?:Pista|Truco)\b[^\n]*(?:\n(?![ \t]*\n)[^\n]*)*",
+                             re.M)
+ARENA_HINT_INLINE = re.compile(
+    r"(?:(?<=\S)|(?<=\n))[ \t]+(?:Pista|Truco)(?: de [^:\n]{0,40})?:.*?"
+    r"(?=\n[ \t]*\n|\n[ \t]*(?:\d+\.|[-*])[ \t]|\n(?=\S)|\Z)", re.S)
+
+
+def arena_filter_md(text):
+    """Quita del enunciado las secciones de ayuda y los bloques plegables de
+    pista/solución, y cambia 'Cuando creas que terminaste' por las reglas."""
+    out, skip, block = [], False, False
+    for line in text.replace("\r\n", "\n").split("\n"):
+        s = line.strip()
+        if block:
+            if s == ":::":
+                block = False
+            continue
+        m = re.match(r"^:::(\w+)", s)
+        if m and m.group(1).lower() in ARENA_HIDE_BLOCKS:
+            block = True
+            continue
+        if line.startswith("## "):
+            title = line[3:]
+            if "creas que terminaste" in title.lower():
+                out += ["## Cuando creas que terminaste", "",
+                        f"Pulsa **Validar** en la web. Tienes **{ARENA_TRIES} intentos**: "
+                        f"cada fallo gasta uno y al {ARENA_TRIES}.º fallo quedas fuera.",
+                        "El resultado sólo dice cuántos objetivos cumples, no cuáles.", ""]
+                skip = True
+                continue
+            skip = bool(ARENA_HIDE_H2.search(title))
+            if skip:
+                continue
+        if not skip:
+            out.append(line)
+    txt = "\n".join(out)
+    # Pistas sueltas dentro del texto (fuera de su sección):
+    # "(Pista: ...)" entre paréntesis,
+    txt = ARENA_HINT_PAREN.sub("", txt)
+    # párrafos o citas que empiezan por "Pista..." / "Truco...",
+    txt = ARENA_HINT_PARA.sub("", txt)
+    # y "... Pista: ..." a media línea, hasta el final del objetivo o párrafo.
+    txt = ARENA_HINT_INLINE.sub("", txt)
+    return re.sub(r"\n{3,}", "\n\n", txt).rstrip() + "\n"
+
+
+def _arena_row(r):
+    return {"id": r[0], "lab": r[1], "startedAt": r[2], "endedAt": r[3],
+            "fails": r[4], "status": r[5],
+            "left": max(0, ARENA_TRIES - r[4]) if r[5] == "en_curso" else 0}
+
+
+_ARENA_COLS = "id, lab_id, started_at, ended_at, fails, status"
+
+
+def arena_active(lab_id):
+    """Partida de arena en curso del lab (dict) o None."""
+    if not DB_ENABLED:
+        return None
+    try:
+        rows = _db(f"SELECT {_ARENA_COLS} FROM arena WHERE lab_id = ? AND "
+                   "status = 'en_curso' ORDER BY id DESC LIMIT 1", (lab_id,))
+    except sqlite3.Error:
+        return None
+    return _arena_row(rows[0]) if rows else None
+
+
+def arena_begin(lab_id):
+    """Devuelve la partida en curso o abre una nueva (los fallos no se borran
+    al parar, reiniciar o recargar: sólo al ganar, perder o abandonar)."""
+    cur = arena_active(lab_id)
+    if cur:
+        return cur
+    ts = datetime.now().astimezone().isoformat(timespec="seconds")
+    _db("INSERT INTO arena (lab_id, started_at, fails, status) "
+        "VALUES (?, ?, 0, 'en_curso')", (lab_id, ts))
+    return arena_active(lab_id)
+
+
+def arena_close(run_id, status, fails=None):
+    ts = datetime.now().astimezone().isoformat(timespec="seconds")
+    if fails is None:
+        _db("UPDATE arena SET status = ?, ended_at = ? WHERE id = ?",
+            (status, ts, run_id))
+    else:
+        _db("UPDATE arena SET status = ?, ended_at = ?, fails = ? WHERE id = ?",
+            (status, ts, fails, run_id))
+
+
+def arena_add_fail(partida):
+    """Suma un fallo. Devuelve la partida actualizada (status 'eliminado' si
+    se pasó del máximo)."""
+    fails = partida["fails"] + 1
+    if fails > ARENA_MAX_FAILS:
+        arena_close(partida["id"], "eliminado", fails)
+    else:
+        _db("UPDATE arena SET fails = ? WHERE id = ?", (fails, partida["id"]))
+    rows = _db(f"SELECT {_ARENA_COLS} FROM arena WHERE id = ?", (partida["id"],))
+    return _arena_row(rows[0])
+
+
+def arena_stats():
+    """{lab_id: {"active": partida|None, "wins", "losses", "last"}}."""
+    if not DB_ENABLED or not os.path.exists(DB_PATH):
+        return {}
+    try:
+        rows = _db(f"SELECT {_ARENA_COLS} FROM arena ORDER BY id")
+    except sqlite3.Error:
+        return {}
+    out = {}
+    for r in rows:
+        partida = _arena_row(r)
+        s = out.setdefault(partida["lab"], {"active": None, "wins": 0,
+                                        "losses": 0, "last": None})
+        if partida["status"] == "en_curso":
+            s["active"] = partida
+        else:
+            s["last"] = partida["status"]
+            if partida["status"] == "superado":
+                s["wins"] += 1
+            else:  # eliminado o abandonado
+                s["losses"] += 1
+    return out
+
+
+def arena_arm(lab_id):
+    """Prepara el contenedor para la arena: esconde el validador real (sólo
+    root), deja en su sitio un aviso y cambia /RETO.md por la versión sin
+    ayudas. Idempotente: se puede llamar en cada arranque o reinicio."""
+    name = f"tc-lab-{lab_id}"
+    script = (f"set -e; install -d -m 700 {ARENA_DIR}; "
+              f"if [ ! -f {ARENA_DIR}/check.sh ]; then "
+              f"mv /opt/lab/check.sh {ARENA_DIR}/check.sh; fi; "
+              # stdin en modo texto mete CRLF en Windows: se limpia dentro
+              "tr -d '\\r' > /opt/lab/check.sh; chmod 755 /opt/lab/check.sh")
+    code, out = run(["docker", "exec", "-i", "-u", "0", name, "bash", "-c",
+                     script], timeout=30, input=ARENA_STUB)
+    if code != 0:
+        return code, out
+    reto = read_md(lab_id, "reto")
+    if reto is not None:
+        run(["docker", "exec", "-i", "-u", "0", name, "bash", "-c",
+             "[ -f /RETO.md ] && tr -d '\\r' > /RETO.md || cat > /dev/null"],
+            timeout=30, input=arena_filter_md(reto))
+    return 0, ""
+
+
+def arena_check_output(out, ok, partida):
+    """Resultado sin detalles: sólo cuántos objetivos se cumplen."""
+    lines = out.splitlines()
+    passed = sum("✓" in ln for ln in lines)
+    pending = sum("✗" in ln for ln in lines)
+    cuenta = (f" {passed} de {passed + pending} objetivo"
+              f"{'s' if passed + pending != 1 else ''} cumplido"
+              f"{'s' if passed + pending != 1 else ''}."
+              if passed + pending else "")
+    if ok:
+        return f"🏆 Arena superada. Todos los objetivos cumplidos."
+    if partida["status"] == "eliminado":
+        return (f"✗ No superado.{cuenta}\n\nFuera: {partida['fails']} fallos. "
+                "El lab se destruye. Puedes volver a la arena con una partida nueva.")
+    left = partida["left"]
+    return (f"✗ No superado.{cuenta}\n\nTe queda{'n' if left != 1 else ''} "
+            f"{left} intento{'s' if left != 1 else ''}.")
 
 
 def db_history(limit=1000):
@@ -935,14 +1131,15 @@ def compose_file(lab_id):
     return f if os.path.isfile(f) else None
 
 
-def run(args, timeout=600, env=None):
+def run(args, timeout=600, env=None, input=None):  # noqa: A002
     """Ejecuta un comando (lista de args, sin shell) y devuelve (code, salida)."""
     try:
         # UTF-8 explícito: en Windows el locale por defecto (cp1252) no decodifica
         # la salida de check.sh (✓, emojis) ni el progreso de docker build.
         p = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=timeout,
-                           env=({**os.environ, **env} if env else None))
+                           env=({**os.environ, **env} if env else None),
+                           input=input)
         return p.returncode, (p.stdout + p.stderr)
     except subprocess.TimeoutExpired:
         return 124, "Tiempo agotado ejecutando el comando."
@@ -1111,7 +1308,8 @@ def reap_once():
         if deadline is not None and now >= deadline:
             destroy(lab_id, "lab resuelto")
             continue
-        if deadline is None and not kept and is_solved(lab_id):
+        if deadline is None and not kept and arena_active(lab_id) is None \
+                and is_solved(lab_id):
             log(f"lab {lab_id}: resuelto desde la terminal, destrucción en {GRACE_S}s")
             with RECORDED_LOCK:
                 ya = lab_id in RECORDED
@@ -1212,6 +1410,7 @@ def labs_payload():
     running = set(running_labs())
     done = db_completions()
     noted = db_noted_labs()
+    arena = arena_stats()
     for lab_id, name, track, diff, cats, desc, skills in LABS:
         out.append({
             "id": lab_id,
@@ -1232,6 +1431,7 @@ def labs_payload():
             "mode": MODE.get(lab_id),
             "completed": done.get(lab_id),  # None o {"count", "last"}
             "hasNotes": lab_id in noted,
+            "arena": arena.get(lab_id),  # None o {"active", "wins", "losses", "last"}
         })
     return out
 
@@ -1338,8 +1538,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"labs": labs_payload()})
         if path == "/api/running":
             ids = running_labs()
+            # 'completed' viaja con el sondeo para que el ✓ y el contador de
+            # la web se actualicen aunque el lab se resuelva desde la terminal.
             return self._json({"running": ids,
-                               "lifecycle": {i: lifecycle(i) for i in ids}})
+                               "lifecycle": {i: lifecycle(i) for i in ids},
+                               "completed": db_completions(),
+                               "arena": arena_stats()})
         if path == "/api/cursos":
             return self._json({"cursos": cursos_payload()})
         if path == "/api/progreso":
@@ -1354,10 +1558,17 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^/api/labs/(\d{2,3})/(reto|solucion|guia)$", path)
         if m:
             lab_id, kind = m.group(1), m.group(2)
+            en_arena = ("arena=1" in urlparse(self.path).query.split("&")
+                        or arena_active(lab_id) is not None)
+            if en_arena and kind != "reto":
+                return self._json({"error": "Modo arena: sin guía ni solución.",
+                                   "arena": True}, 403)
             txt = read_md(lab_id, kind)
             if txt is None:
                 return self._json({"error": "no disponible"}, 404)
-            return self._json({"markdown": txt})
+            if en_arena:
+                txt = arena_filter_md(txt)
+            return self._json({"markdown": txt, "arena": en_arena})
         m = re.match(r"^/api/labs/(\d{2,3})/notes$", path)
         if m:
             if m.group(1) not in LAB_BY_ID:
@@ -1374,6 +1585,7 @@ class Handler(BaseHTTPRequestHandler):
                 "ttydPort": TTYD_BASE + int(lab_id),
                 "mode": mode,
                 "redCapable": red_capable(lab_id),
+                "arena": arena_stats().get(lab_id),
                 **lifecycle(lab_id),
             }
             if mode == "red" and payload["running"]:
@@ -1396,7 +1608,7 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^/api/labs/(\d{2,3})/complete$", path)
         if m:
             return self._complete_local(m.group(1))
-        m = re.match(r"^/api/labs/(\d{2,3})/(start|stop|reset|check|keep|flag)$",
+        m = re.match(r"^/api/labs/(\d{2,3})/(start|stop|reset|check|keep|flag|abandon)$",
                      path)
         if not m:
             return self._json({"error": "ruta desconocida"}, 404)
@@ -1408,7 +1620,24 @@ class Handler(BaseHTTPRequestHandler):
                                "aplica en tu propio sistema."}, 400)
 
         qs = url.query.split("&")
-        want_red = "mode=red" in qs and red_capable(lab_id)
+        # Arena: la pide el cliente (?arena=1) o ya hay una partida en curso,
+        # que manda siempre (no se escapa de la arena arrancando en normal).
+        partida = arena_active(lab_id)
+        want_arena = "arena=1" in qs or partida is not None
+        if want_arena and not DB_ENABLED:
+            return self._json({"ok": False, "error": "La arena necesita el "
+                               "registro SQLite (quita TCLAB_DB=0)."}, 409)
+        want_red = "mode=red" in qs and red_capable(lab_id) and not want_arena
+
+        if action == "abandon":
+            if partida is None:
+                return self._json({"ok": False,
+                                   "error": "No hay partida de arena en curso."}, 409)
+            arena_close(partida["id"], "abandonado")
+            threading.Thread(target=destroy, args=(lab_id, "arena abandonada"),
+                             daemon=True).start()
+            return self._json({"ok": True, "arena": arena_stats().get(lab_id),
+                               "running": False})
 
         # Envío de bandera (solo modo red): comparar contra lo que el target
         # guarda en /opt/lab/.flags, que solo lee el servidor (docker exec -u 0).
@@ -1469,6 +1698,8 @@ class Handler(BaseHTTPRequestHandler):
                 KEPT.add(lab_id)
             return self._json({"ok": True, **lifecycle(lab_id)})
 
+        if action == "check" and partida is not None:
+            return self._arena_check(lab_id, partida)
         if action == "check":
             code, out = dc(lab_id, "exec", "-T", "lab", "bash",
                            "/opt/lab/check.sh", timeout=180)
@@ -1508,6 +1739,8 @@ class Handler(BaseHTTPRequestHandler):
                     if code == 0:
                         with LOCK:
                             MODE[lab_id] = "red" if want_red else "blue"
+                        if want_arena:
+                            code, out = self._arena_start(lab_id, out)
                 elif action == "stop":
                     code, out = _down()
                     with LOCK:
@@ -1518,6 +1751,8 @@ class Handler(BaseHTTPRequestHandler):
                     if code == 0:
                         with LOCK:
                             MODE[lab_id] = "red" if want_red else "blue"
+                        if want_arena:
+                            code, out = self._arena_start(lab_id, out)
             finally:
                 with LOCK:
                     BUSY.discard(lab_id)
@@ -1529,8 +1764,70 @@ class Handler(BaseHTTPRequestHandler):
             "running": container_running(lab_id),
             "mode": MODE.get(lab_id),
             "redCapable": red_capable(lab_id),
+            "arena": arena_stats().get(lab_id),
             **lifecycle(lab_id),
         })
+
+    # ---- arena ----
+    def _arena_start(self, lab_id, out):
+        """Tras levantar el contenedor: abre (o retoma) la partida y arma el
+        contenedor. Si no se puede armar, se destruye: nunca queda un lab en
+        arena con el validador o las pistas a la vista."""
+        arena_begin(lab_id)
+        code, err = arena_arm(lab_id)
+        if code != 0:
+            destroy(lab_id, "no pude preparar la arena")
+            return code, out + "\n[arena] no pude preparar el contenedor: " + err
+        return 0, out
+
+    def _arena_check(self, lab_id, partida):
+        with LOCK:
+            if lab_id in ARENA_CHECKING:
+                return self._json({"ok": False, "error": "Ya hay una validación "
+                                   "en curso."}, 409)
+            ARENA_CHECKING.add(lab_id)
+        try:
+            if not container_running(lab_id):
+                return self._json({"ok": False, "running": False,
+                                   "error": "El lab no está corriendo: inícialo "
+                                   "(no gasta intento)."}, 409)
+            name = f"tc-lab-{lab_id}"
+            c, _ = run(["docker", "exec", "-u", "0", name, "test", "-f",
+                        f"{ARENA_DIR}/check.sh"], timeout=20)
+            if c != 0:  # contenedor sin armar (p. ej. arrancado antes de la arena)
+                c, err = arena_arm(lab_id)
+                if c != 0:
+                    return self._json({"ok": False, "error": "No pude preparar "
+                                       "la arena: " + err[-500:]}, 500)
+            code, out = run(["docker", "exec", "-u", "0", name, "bash",
+                             f"{ARENA_DIR}/check.sh"], timeout=180)
+            if code in (124, 127):  # tiempo agotado o sin docker: no es fallo tuyo
+                return self._json({"ok": False, "error": out[-500:]}, 500)
+            if code == 0:
+                arena_close(partida["id"], "superado")
+                db_record_completion(lab_id, "arena")
+                schedule_destroy(lab_id)
+                partida = {**partida, "status": "superado", "left": 0}
+            else:
+                partida = arena_add_fail(partida)
+                if partida["status"] == "eliminado":
+                    threading.Thread(target=destroy,
+                                     args=(lab_id, "arena: fuera tras 3 fallos"),
+                                     daemon=True).start()
+            return self._json({
+                "ok": code == 0,
+                "code": code,
+                "output": arena_check_output(out, code == 0, partida),
+                "eliminated": partida["status"] == "eliminado",
+                "running": partida["status"] != "eliminado",
+                "mode": MODE.get(lab_id),
+                "arena": arena_stats().get(lab_id),
+                "run": partida,
+                **lifecycle(lab_id),
+            })
+        finally:
+            with LOCK:
+                ARENA_CHECKING.discard(lab_id)
 
 
 def _raise_interrupt(signum, frame):  # noqa: ARG001

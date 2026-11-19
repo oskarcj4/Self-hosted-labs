@@ -110,6 +110,37 @@ borra tus notas).
 > host). Si dos caminos ven la misma resolución, sólo queda una fila: no se
 > repite un lab dentro de 2 minutos.
 
+## ⚔️ Modo arena: tú contra la terminal
+
+El botón **⚔ Arena** de la barra superior cambia a modo arena. Son los mismos
+labs y los mismos contenedores, pero sin ayuda:
+
+- **Sin guía ni solución.** No aparecen las pestañas *Guiada* ni *Solución*, y
+  el servidor contesta 403 si se piden.
+- **Sin pistas.** El enunciado llega filtrado: se quitan *Pistas*, *Comandos que
+  te pueden servir*, los bloques plegables y las pistas sueltas del texto. El
+  `/RETO.md` del contenedor se sustituye por esa misma versión. El bloc de notas
+  también se oculta.
+- **3 intentos.** Cada **Validar** que falla gasta uno. Al tercer fallo quedas
+  fuera: la partida cuenta como derrota y el lab se destruye. Antes del último
+  intento la web pide confirmación.
+- **Resultado mudo.** Validar sólo dice cuántos objetivos cumples, no cuáles.
+- **Sin atajos.** El validador real se guarda en `/root/.tclab-arena`, y
+  `/opt/lab/check.sh` pasa a ser un aviso. Resolverlo en la terminal no da la
+  victoria: sólo cuenta **Validar** en la web. Detener, reiniciar o volver al
+  modo normal no devuelven intentos: la partida vive en `progreso.db` (tabla
+  `arena`) hasta que la ganas, la pierdes o la **abandonas**, que cuenta como
+  derrota.
+
+Todo se hace desde el servidor, sin imágenes ni contenedores nuevos. Una
+victoria se registra en tu progreso con origen *Arena*, y las tarjetas muestran
+los intentos que te quedan, ✓ si la superaste o «fuera». La arena necesita el
+registro SQLite (no funciona con `TCLAB_DB=0`).
+
+> Es un modo de honor, no un sandbox. El usuario `analista` tiene `sudo` en
+> los labs, así que quien quiera hacer trampa puede leer el validador
+> escondido. La arena quita las ayudas, no la posibilidad de hacer trampa.
+
 ## 🗺️ Qué vas a practicar
 
 ### 🔴 Pista A — Detección y respuesta a incidentes (01–15)
