@@ -50,6 +50,18 @@ compose() { need_compose "$1"; docker compose -f "$1/docker-compose.yml" "${@:2}
 destroy() { echo ">>> Destruyendo lab $(basename "$1")…"; compose "$1" down -v --remove-orphans -t 5; }
 lab_id() { basename "$1" | cut -d- -f1; }
 solved() { docker exec "tc-lab-$(lab_id "$1")" test -e "$MARKER" 2>/dev/null; }
+# Registra el lab resuelto en progreso.db (lo mismo que hace la web).
+# No bloquea nunca: si no hay Python, sólo avisa.
+record() {
+  local py
+  for py in python3 python; do
+    if "$py" -c 'import sqlite3' >/dev/null 2>&1; then
+      "$py" "$ROOT/server.py" --record "$(lab_id "$1")" terminal >/dev/null 2>&1 \
+        && echo ">>> Guardado en tu progreso (progreso.db)." && return 0
+    fi
+  done
+  echo ">>> Aviso: no pude guardar el lab en progreso.db (¿Python 3 instalado?)." >&2
+}
 
 cmd="${1:-}"; shift || true
 case "$cmd" in
@@ -72,6 +84,7 @@ case "$cmd" in
       compose "$d" exec lab bash -c 'su - analista' || true
     fi
     if solved "$d"; then
+      record "$d"
       destroy "$d"
     else
       ans=s
@@ -82,6 +95,7 @@ case "$cmd" in
   check)
     d="$(lab_dir "$1")"
     if compose "$d" exec -T lab bash /opt/lab/check.sh; then
+      record "$d"
       destroy "$d"
     else
       exit 1
