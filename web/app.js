@@ -1,4 +1,4 @@
-/* TerminalCero Lab — frontend (JS vanilla). SPA mínima: lista + detalle. */
+/* Self-hosted-labs — frontend (JS vanilla). SPA mínima: lista + detalle. */
 "use strict";
 
 const view = document.getElementById("view");
@@ -427,6 +427,8 @@ function updateRunningUI(changed = true) {
   if (STATE.view === "home") {
     const slot = view.querySelector("#runningSlot");
     if (slot) { slot.innerHTML = runningPanelHTML(); bindRunningPanel(slot); }
+    const box = view.querySelector("#runningBox");
+    if (box) box.hidden = n === 0;
     repaintCardStates();
   } else {
     renderOthersBanner();
@@ -788,6 +790,12 @@ async function renderCourse(id) {
   view.querySelector("#mdCurso").innerHTML = txt ? md(txt) : "No disponible.";
 }
 
+/* Aviso permanente del inicio: los labs con contenedor necesitan Docker Desktop. */
+const dockerNoticeHTML = `<div class="notice notice--info" role="note">
+  <svg class="notice__icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.7" r=".95" fill="currentColor"/></svg>
+  <span><strong>Asegúrate de tener Docker Desktop habilitado</strong> antes de iniciar un lab.</span>
+</div>`;
+
 function renderHome() {
   STATE.view = "home";
   setHash("");
@@ -810,11 +818,19 @@ function renderHome() {
     </section>
     <div id="arenaSummary">${arenaSummaryHTML()}</div>` : `<section class="hero">
       <h1>Laboratorio de defensa en Linux</h1>
-      <p>Escenarios reales de detección, respuesta a incidentes y hardening. Levanta un contenedor con un botón, abre la terminal en el navegador y valida tu solución. Todo local e inofensivo.</p>
+      <p>Escenarios reales de detección, respuesta a incidentes y hardening, en contenedores de tu propia máquina. Todo local e inofensivo.</p>
+      <ol class="steps" aria-label="Cómo empezar">
+        <li><span class="steps__n" aria-hidden="true">1</span>Elige un lab de la lista</li>
+        <li><span class="steps__n" aria-hidden="true">2</span>Pulsa <strong>▶ Iniciar</strong></li>
+        <li><span class="steps__n" aria-hidden="true">3</span>Resuélvelo en la terminal y pulsa <strong>✓ Validar</strong></li>
+      </ol>
     </section>
     <div id="homeProgress">${homeProgressHTML(progressCounts().done, progressCounts().total)}</div>`}
-    <div class="section-label" id="runningLabel">En ejecución</div>
-    <div id="runningSlot">${runningPanelHTML()}</div>
+    ${dockerNoticeHTML}
+    <div id="runningBox"${runningLabs().length ? "" : " hidden"}>
+      <div class="section-label" id="runningLabel">En ejecución</div>
+      <div id="runningSlot">${runningPanelHTML()}</div>
+    </div>
     ${Object.keys(TRACKS).map(trackHTML).join("")}
   `;
 
@@ -1595,7 +1611,7 @@ async function boot() {
     buildTrackMenu();
     paintProgress();
     loadPopouts(); // pestañas de terminal abiertas antes de recargar
-    route(); // abre directamente la vista de la URL (p.ej. /#cursos)
+    renderHome(); // al abrir la web siempre se ve la lista de labs (no la última vista de la URL)
     initPolling();
   } catch (e) {
     view.innerHTML = `<div class="empty">No se pudo contactar el backend. ¿Corriste <code>python3 server.py</code>?<br><small>${esc(e.message)}</small></div>`;

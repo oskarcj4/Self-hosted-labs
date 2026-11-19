@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TerminalCero Lab — backend local (stdlib, cero dependencias).
+Self-hosted-labs — backend local (stdlib, cero dependencias).
 
 Sirve la interfaz web (./web) y una pequeña API que levanta/para/valida los
 contenedores Docker de cada lab. Pensado para correr SOLO en tu máquina:
@@ -1447,7 +1447,7 @@ class LabServer(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "TerminalCeroLab/1.0"
+    server_version = "SelfHostedLabs/1.0"
 
     def log_message(self, fmt, *args):  # salida compacta
         sys.stderr.write("  %s\n" % (fmt % args))
@@ -1856,7 +1856,7 @@ def main():
     # Limpia restos de una ejecución anterior y vigila el ciclo de vida.
     threading.Thread(target=reaper_loop, daemon=True).start()
     url = f"http://localhost:{PORT}"
-    print(f"TerminalCero Lab escuchando en {url}")
+    print(f"Self-hosted-labs escuchando en {url}")
     ttl = f"{TTL_MIN} min" if TTL_MIN > 0 else "sin límite"
     print(f"Autodestrucción: al resolver (+{GRACE_S}s), TTL {ttl}, al salir"
           + (" [desactivada al salir: TCLAB_KEEP_ON_EXIT=1]" if KEEP_ON_EXIT else ""))

@@ -1,11 +1,11 @@
 <div align="center">
 
 ```
- _____                   _             _  ____
-|_   _|__ _ __ _ __ ___ (_)_ __   __ _| |/ ___|___ _ __ ___
-  | |/ _ \ '__| '_ ` _ \| | '_ \ / _` | | |   / _ \ '__/ _ \
-  | |  __/ |  | | | | | | | | | | (_| | | |__|  __/ | | (_) |
-  |_|\___|_|  |_| |_| |_|_|_| |_|\__,_|_|\____\___|_|  \___/   LAB
+ ____         _   __         _                  _              _
+/ ___|   ___ | | / _|       | |__    ___   ___ | |_   ___   __| |
+\___ \  / _ \| || |_  _____ | '_ \  / _ \ / __|| __| / _ \ / _` |
+ ___) ||  __/| ||  _||_____|| | | || (_) |\__ \| |_ |  __/| (_| |
+|____/  \___||_||_|         |_| |_| \___/ |___/ \__| \___| \__,_|   LABS
 ```
 
 # 💸 Adiós a las plataformas que te cobran una fortuna por aprender hacking
@@ -28,10 +28,10 @@ Aprender seguridad práctica no debería costar una suscripción mensual, ni
 depender de que una VM remota tenga sitio libre, ni cortarse a los 60 minutos
 justo cuando por fin entendías el problema.
 
-TerminalCero Lab es la misma experiencia —escenario roto, terminal en el
+Self-hosted-labs es la misma experiencia —escenario roto, terminal en el
 navegador, botón de **Validar**— pero corriendo **100 % en local** sobre Docker:
 
-| | Plataformas de pago típicas | **TerminalCero Lab** |
+| | Plataformas de pago típicas | **Self-hosted-labs** |
 |---|---|---|
 | Precio | Suscripción mensual o anual | **0 €** |
 | Dónde corre | Su nube | **Tu máquina** |
