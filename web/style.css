@@ -1,4 +1,4 @@
-/* TerminalCero Lab — estilo Vercel (Geist, blanco/negro, bordes hairline). */
+/* Self-hosted-labs — estilo Vercel (Geist, blanco/negro, bordes hairline). */
 
 :root {
   --bg: #ffffff;
@@ -13,10 +13,13 @@
   --accent-fg: #ffffff;
   --ok: #0a7d33;             /* verde: resuelto/activo */
   --ok-bg: #e6f6ec;
+  --ok-fg: #ffffff;          /* sobre --ok: 5.26:1 */
   --warn: #9a6700;           /* ámbar */
   --warn-bg: #fff8e6;
   --danger: #b4231f;
   --danger-bg: #fdeceb;
+  --info: #0b62c4;           /* azul: avisos informativos, 5.17:1 sobre --info-bg */
+  --info-bg: #e8f1fc;
   --radius: 8px;
   --radius-sm: 6px;
   --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -44,10 +47,13 @@
   --accent-fg: #000000;
   --ok: #4ed17f;
   --ok-bg: #0e2a18;
+  --ok-fg: #000000;          /* sobre --ok: 10.75:1 */
   --warn: #e8c468;
   --warn-bg: #2a2109;
   --danger: #ff6166;
   --danger-bg: #2a0f0f;
+  --info: #6fb1ff;           /* 7.45:1 sobre --info-bg */
+  --info-bg: #0d1f35;
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.4);
   --cat-devsecops: #c58af9; --cat-devsecops-bg: #241333;
   --cat-devops: #6fb1ff;    --cat-devops-bg: #0d1f35;
@@ -142,6 +148,14 @@ a { color: inherit; text-decoration: none; }
 .hero { margin-bottom: 36px; }
 .hero h1 { font-size: 34px; line-height: 1.15; letter-spacing: -.03em; margin: 0 0 10px; font-weight: 700; }
 .hero p { color: var(--fg-muted); max-width: 60ch; margin: 0; }
+/* "Cómo empezar": tres pasos en línea, se apilan en pantallas estrechas */
+.steps { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 18px 0 0; padding: 0; font-size: 14px; }
+.steps li { display: inline-flex; align-items: center; gap: 8px; }
+.steps__n {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; flex: none;
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border-strong); border-radius: 999px; color: var(--fg-muted);
+}
 
 .section-label {
   font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
@@ -206,6 +220,11 @@ a { color: inherit; text-decoration: none; }
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
   color: var(--ok); background: var(--ok-bg);
 }
+.notice--info {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 18px 0 0; color: var(--info); background: var(--info-bg);
+}
+.notice__icon { flex: none; margin-top: 2px; }
 .notice__actions { display: inline-flex; gap: 6px; margin-left: auto; }
 .badge.warn { color: var(--warn); background: var(--warn-bg); border-color: transparent; font-family: var(--mono); }
 .muted { color: var(--fg-muted); }
@@ -534,3 +553,74 @@ body:has(.container--wide) .nav__inner { max-width: 1600px; } /* nav alineado co
 .prog-table tbody tr:last-child td { border-bottom: 0; }
 .prog-table td.mono { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
 .prog-table a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---------- completado: check verde + contador ---------- */
+/* Verde (--ok) = resuelto/activo; el check (forma) lo distingue del punto de "activo". */
+.card__state { display: inline-flex; align-items: center; gap: 8px; }
+.done-mark {
+  display: inline-grid; place-items: center; flex: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  color: var(--ok-fg); background: var(--ok);
+}
+.done-mark--empty { color: var(--fg-faint); background: transparent; border: 1px solid var(--border-strong); }
+.badge.done { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+.card--done { border-color: color-mix(in srgb, var(--ok) 35%, var(--border)); }
+.card--done:hover { border-color: color-mix(in srgb, var(--ok) 60%, var(--border)); }
+
+.chip__count {
+  display: inline-flex; align-items: center; gap: 3px; margin-left: 7px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+.chip__count:empty { display: none; }
+.chip__count.has-done { color: var(--ok); }
+
+.home-progress {
+  display: flex; align-items: center; gap: 12px;
+  margin: -12px 0 4px; padding: 12px 16px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--fg); text-decoration: none; transition: .15s;
+}
+.home-progress:hover { border-color: var(--border-strong); }
+.home-progress:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.home-progress__text { font-size: 14px; white-space: nowrap; }
+.home-progress__text strong { font-variant-numeric: tabular-nums; }
+.home-progress .prog-bar { flex: 1; min-width: 60px; }
+.home-progress__pct { font-family: var(--mono); font-size: 12px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.home-progress__link { font-size: 13px; color: var(--fg-muted); white-space: nowrap; }
+.home-progress:hover .home-progress__link { color: var(--fg); }
+@media (max-width: 600px) {
+  .home-progress { flex-wrap: wrap; row-gap: 10px; }
+  .home-progress .prog-bar { order: 5; flex-basis: 100%; }
+  .home-progress__link { margin-left: auto; }
+}
+
+/* Nav en móvil: sin desbordar la página. El texto de la marca y de
+   "en ejecución" se ocultan (siguen en aria-label) y los enlaces se
+   desplazan en horizontal si no caben. */
+@media (max-width: 600px) {
+  .brand__name { display: none; }
+  .nav__links { overflow-x: auto; scrollbar-width: none; }
+  .nav__links::-webkit-scrollbar { display: none; }
+  .nav__links > * { flex-shrink: 0; white-space: nowrap; }
+  .run-indicator__txt { display: none; }
+  .home-progress__link { display: none; }
+  .home-progress__pct { margin-left: auto; }
+}
+
+/* ---------- modo arena ----------
+   Ámbar (--warn) = precaución: el modo sin ayudas y los intentos que quedan.
+   Rojo (--danger) = fuera / último intento. Siempre con texto, no sólo color. */
+.chip--arena[aria-pressed="true"] { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+.hero__eyebrow {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--warn); margin-bottom: 10px;
+}
+.notice--arena { line-height: 1.55; }
+.badge.tries { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+.badge.tries--last, .badge.out { color: var(--danger); background: var(--danger-bg); border-color: transparent; }
+.tries__dots { display: inline-flex; gap: 3px; }
+.tries__dots i { width: 6px; height: 6px; border-radius: 50%; border: 1px solid currentColor; box-sizing: border-box; }
+.tries__dots i.on { background: currentColor; }
+.home-progress--static:hover { border-color: var(--border); }
+.btn[hidden] { display: none; }

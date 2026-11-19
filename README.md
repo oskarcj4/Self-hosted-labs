@@ -1,11 +1,11 @@
 <div align="center">
 
 ```
- _____                   _             _  ____
-|_   _|__ _ __ _ __ ___ (_)_ __   __ _| |/ ___|___ _ __ ___
-  | |/ _ \ '__| '_ ` _ \| | '_ \ / _` | | |   / _ \ '__/ _ \
-  | |  __/ |  | | | | | | | | | | (_| | | |__|  __/ | | (_) |
-  |_|\___|_|  |_| |_| |_|_|_| |_|\__,_|_|\____\___|_|  \___/   LAB
+ ____         _   __         _                  _              _
+/ ___|   ___ | | / _|       | |__    ___   ___ | |_   ___   __| |
+\___ \  / _ \| || |_  _____ | '_ \  / _ \ / __|| __| / _ \ / _` |
+ ___) ||  __/| ||  _||_____|| | | || (_) |\__ \| |_ |  __/| (_| |
+|____/  \___||_||_|         |_| |_| \___/ |___/ \__| \___| \__,_|   LABS
 ```
 
 # 💸 Adiós a las plataformas que te cobran una fortuna por aprender hacking
@@ -28,10 +28,10 @@ Aprender seguridad práctica no debería costar una suscripción mensual, ni
 depender de que una VM remota tenga sitio libre, ni cortarse a los 60 minutos
 justo cuando por fin entendías el problema.
 
-TerminalCero Lab es la misma experiencia —escenario roto, terminal en el
+Self-hosted-labs es la misma experiencia —escenario roto, terminal en el
 navegador, botón de **Validar**— pero corriendo **100 % en local** sobre Docker:
 
-| | Plataformas de pago típicas | **TerminalCero Lab** |
+| | Plataformas de pago típicas | **Self-hosted-labs** |
 |---|---|---|
 | Precio | Suscripción mensual o anual | **0 €** |
 | Dónde corre | Su nube | **Tu máquina** |
@@ -109,6 +109,37 @@ borra tus notas).
 > también lo registran, aunque la web esté apagada (necesita Python 3 en el
 > host). Si dos caminos ven la misma resolución, sólo queda una fila: no se
 > repite un lab dentro de 2 minutos.
+
+## ⚔️ Modo arena: tú contra la terminal
+
+El botón **⚔ Arena** de la barra superior cambia a modo arena. Son los mismos
+labs y los mismos contenedores, pero sin ayuda:
+
+- **Sin guía ni solución.** No aparecen las pestañas *Guiada* ni *Solución*, y
+  el servidor contesta 403 si se piden.
+- **Sin pistas.** El enunciado llega filtrado: se quitan *Pistas*, *Comandos que
+  te pueden servir*, los bloques plegables y las pistas sueltas del texto. El
+  `/RETO.md` del contenedor se sustituye por esa misma versión. El bloc de notas
+  también se oculta.
+- **3 intentos.** Cada **Validar** que falla gasta uno. Al tercer fallo quedas
+  fuera: la partida cuenta como derrota y el lab se destruye. Antes del último
+  intento la web pide confirmación.
+- **Resultado mudo.** Validar sólo dice cuántos objetivos cumples, no cuáles.
+- **Sin atajos.** El validador real se guarda en `/root/.tclab-arena`, y
+  `/opt/lab/check.sh` pasa a ser un aviso. Resolverlo en la terminal no da la
+  victoria: sólo cuenta **Validar** en la web. Detener, reiniciar o volver al
+  modo normal no devuelven intentos: la partida vive en `progreso.db` (tabla
+  `arena`) hasta que la ganas, la pierdes o la **abandonas**, que cuenta como
+  derrota.
+
+Todo se hace desde el servidor, sin imágenes ni contenedores nuevos. Una
+victoria se registra en tu progreso con origen *Arena*, y las tarjetas muestran
+los intentos que te quedan, ✓ si la superaste o «fuera». La arena necesita el
+registro SQLite (no funciona con `TCLAB_DB=0`).
+
+> Es un modo de honor, no un sandbox. El usuario `analista` tiene `sudo` en
+> los labs, así que quien quiera hacer trampa puede leer el validador
+> escondido. La arena quita las ayudas, no la posibilidad de hacer trampa.
 
 ## 🗺️ Qué vas a practicar
 

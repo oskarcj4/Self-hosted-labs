@@ -1,4 +1,4 @@
-/* TerminalCero Lab — frontend (JS vanilla). SPA mínima: lista + detalle. */
+/* Self-hosted-labs — frontend (JS vanilla). SPA mínima: lista + detalle. */
 "use strict";
 
 const view = document.getElementById("view");
@@ -139,11 +139,139 @@ const catsHTML = (l) => (l.categories || [])
 
 const liveBadge = '<span class="badge live"><span class="dot"></span>activo</span>';
 
+/* Completado: verde + forma de check (nunca sólo color). */
+const checkIcon = (s = 10) => `<svg width="${s}" height="${s}" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.3 5 8.6l4.5-5.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const doneTitle = (l) => `Completado ${l.completed.count}× · último ${fmtDate(l.completed.last)}`;
+/* Círculo verde con check, para la esquina de la tarjeta. */
+const doneMark = (l) => l.completed
+  ? `<span class="done-mark" role="img" aria-label="${esc(doneTitle(l))}" title="${esc(doneTitle(l))}">${checkIcon()}</span>` : "";
+/* Pastilla con texto, para el detalle del lab. */
+const doneBadge = (l) => l.completed
+  ? `<span class="badge done" title="${esc(doneTitle(l))}">${checkIcon()}Completado${l.completed.count > 1 ? ` · ${l.completed.count}×` : ""}</span>` : "";
+const cardStateHTML = (l) => (STATE.arena ? arenaMark(l) : doneMark(l))
+  + (l.running ? liveBadge : diffDots(l.difficulty));
+
+/* ---------- modo arena ----------
+   Mismos labs y contenedores; sin guía, solución ni pistas, y 3 intentos de
+   Validar. El servidor lo impone (oculta el validador, filtra el enunciado y
+   cuenta los fallos en SQLite); la web sólo lo refleja. */
+const ARENA_TRIES = 3;
+const arenaOn = (l) => STATE.arena || !!(l && l.arena && l.arena.active);
+const arenaRun = (l) => (l && l.arena && l.arena.active) || null;
+
+function loadArenaPref() {
+  try { return localStorage.getItem("tc-arena") === "1"; } catch { return false; }
+}
+function setArena(on) {
+  STATE.arena = on;
+  try { localStorage.setItem("tc-arena", on ? "1" : "0"); } catch {}
+  document.documentElement.toggleAttribute("data-arena", on);
+  const chip = document.querySelector('.chip[data-route="arena"]');
+  if (chip) chip.setAttribute("aria-pressed", on);
+  route();
+}
+
+/* Texto de intentos: "2 de 3 intentos". */
+const triesText = (left) => `${left} de ${ARENA_TRIES} intento${ARENA_TRIES === 1 ? "" : "s"}`;
+function triesHTML(left) {
+  const dots = Array.from({ length: ARENA_TRIES }, (_, i) => `<i class="${i < left ? "on" : ""}"></i>`).join("");
+  return `<span class="badge tries${left === 1 ? " tries--last" : ""}" title="${triesText(left)} restantes"><span class="tries__dots" aria-hidden="true">${dots}</span>${left === 1 ? "último intento" : `${left} intentos`}</span>`;
+}
+/* Estado de arena de la tarjeta: en curso (intentos), superada (✓) o fuera. */
+function arenaMark(l) {
+  const a = l.arena;
+  if (!a) return "";
+  if (a.active) return triesHTML(a.active.left);
+  if (a.wins) return `<span class="done-mark" role="img" aria-label="Arena superada ${a.wins}×" title="Arena superada ${a.wins}×">${checkIcon()}</span>`;
+  if (a.losses) return `<span class="badge out" title="${a.last === "abandonado" ? "Abandonaste la última partida" : "Fuera en la última partida"}">✗ fuera</span>`;
+  return "";
+}
+/* Pastilla del detalle. */
+function arenaStateHTML(l) {
+  const a = l.arena || {};
+  if (a.active) return triesHTML(a.active.left);
+  if (a.wins) return `<span class="badge done">${checkIcon()}Arena superada${a.wins > 1 ? ` · ${a.wins}×` : ""}</span>`;
+  if (a.last) return `<span class="badge out">✗ ${a.last === "abandonado" ? "Abandonada" : "Fuera"} en la última partida</span>`;
+  return `<span class="badge">${ARENA_TRIES} intentos</span>`;
+}
+
+/* Confirmación para lo que no tiene vuelta atrás en arena (último intento,
+   abandonar). La opción segura es la principal y tiene el foco. */
+function askArena(title, html, goLabel, safeLabel = "Seguir trabajando") {
+  let dlg = document.getElementById("arenaDialog");
+  if (!dlg) {
+    dlg = document.createElement("dialog");
+    dlg.id = "arenaDialog";
+    dlg.className = "dialog";
+    document.body.appendChild(dlg);
+  }
+  dlg.innerHTML = `<form method="dialog">
+    <h2 class="dialog__title">${esc(title)}</h2>
+    <p class="dialog__text">${html}</p>
+    <div class="dialog__actions">
+      <button class="btn" value="go">${esc(goLabel)}</button>
+      <button class="btn btn--primary" value="cancel" autofocus>${esc(safeLabel)}</button>
+    </div>
+  </form>`;
+  return new Promise((resolve) => {
+    dlg.addEventListener("close", () => resolve(dlg.returnValue === "go"), { once: true });
+    dlg.returnValue = "";
+    dlg.showModal();
+  });
+}
+
+function arenaSummaryHTML() {
+  const labs = STATE.labs.filter((l) => l.exists && !l.local);
+  const won = labs.filter((l) => l.arena && l.arena.wins).length;
+  const live = labs.filter((l) => l.arena && l.arena.active).length;
+  const out = labs.filter((l) => l.arena && !l.arena.wins && !l.arena.active && l.arena.losses).length;
+  const pct = labs.length ? Math.round((won / labs.length) * 100) : 0;
+  return `<div class="home-progress home-progress--static" role="group" aria-label="Arena: ${won} de ${labs.length} labs superados">
+    <span class="done-mark${won ? "" : " done-mark--empty"}" aria-hidden="true">${checkIcon()}</span>
+    <span class="home-progress__text"><strong>${won}</strong> de ${labs.length} superados en arena</span>
+    <span class="prog-bar" aria-hidden="true"><span style="width:${pct}%"></span></span>
+    <span class="home-progress__pct">${live} en curso · ${out} fuera</span>
+  </div>`;
+}
+
+function syncArena(map) {
+  if (!map) return;
+  let changed = false;
+  STATE.labs.forEach((l) => {
+    const a = map[l.id] || null;
+    if (JSON.stringify(a) !== JSON.stringify(l.arena || null)) changed = true;
+    l.arena = a;
+  });
+  if (!changed) return;
+  if (STATE.view === "home") {
+    repaintCardStates();
+    const s = view.querySelector("#arenaSummary");
+    if (s) s.innerHTML = arenaSummaryHTML();
+  }
+  const cur = STATE.labs.find((x) => x.id === STATE.view);
+  if (cur) paintArenaState(cur);
+}
+
+function arenaNoticeHTML(l) {
+  const run = arenaRun(l);
+  return `<div class="notice notice--arena" role="note">
+    <strong>⚔ Arena${run && !STATE.arena ? " · partida en curso" : ""}.</strong>
+    Sin resolución guiada, sin solución y sin pistas: el enunciado y la terminal.
+    Cada fallo al validar gasta un intento (${ARENA_TRIES} en total); al ${ARENA_TRIES}.º, fuera y el lab se destruye.
+    Validar sólo dice cuántos objetivos cumples. Detener o reiniciar no devuelve intentos.
+  </div>`;
+}
+
+function paintArenaState(l) {
+  const el = view.querySelector("#arenaState");
+  if (el) el.innerHTML = arenaStateHTML(l);
+}
+
 function cardHTML(l) {
-  return `<article class="card" tabindex="0" role="button" data-id="${l.id}" aria-label="Abrir lab ${l.id}: ${esc(l.name)}">
+  return `<article class="card${l.completed ? " card--done" : ""}" tabindex="0" role="button" data-id="${l.id}" aria-label="Abrir lab ${l.id}: ${esc(l.name)}${l.completed ? " (completado)" : ""}">
     <div class="card__top">
-      <span class="card__id">${l.local ? "GUÍA" : "LAB"} ${l.id}${l.completed ? ` <span title="Completado ${l.completed.count}× · último ${esc(l.completed.last)}">✓</span>` : ""}${l.hasNotes ? ` <span title="Tiene notas">✎</span>` : ""}</span>
-      <span class="card__state">${l.running ? liveBadge : diffDots(l.difficulty)}</span>
+      <span class="card__id">${l.local ? "GUÍA" : "LAB"} ${l.id}${l.hasNotes ? ` <span title="Tiene notas">✎</span>` : ""}</span>
+      <span class="card__state">${cardStateHTML(l)}</span>
     </div>
     <div class="card__cats">${catsHTML(l)}</div>
     <h3 class="card__title">${esc(l.name)}</h3>
@@ -282,6 +410,8 @@ async function refreshRunning() {
     l.destroyIn = dIn;
     l.expiresIn = r ? (lc.expiresIn ?? null) : null;
   });
+  syncCompleted(d.completed).forEach((id) => toast(`✓ Lab ${id} completado y guardado en tu progreso`));
+  syncArena(d.arena);
   updateRunningUI(changed);
   renderLifeBanner();
 }
@@ -291,19 +421,86 @@ function updateRunningUI(changed = true) {
   const ind = document.getElementById("runIndicator");
   if (ind) {
     ind.hidden = n === 0;
-    ind.innerHTML = `<span class="dot"></span>${n} en ejecución`;
+    ind.innerHTML = `<span class="dot"></span>${n}<span class="run-indicator__txt"> en ejecución</span>`;
   }
   if (!changed) return;
   if (STATE.view === "home") {
     const slot = view.querySelector("#runningSlot");
     if (slot) { slot.innerHTML = runningPanelHTML(); bindRunningPanel(slot); }
-    view.querySelectorAll(".card").forEach((c) => {
-      const l = STATE.labs.find((x) => x.id === c.dataset.id);
-      c.querySelector(".card__state").innerHTML = l.running ? liveBadge : diffDots(l.difficulty);
-    });
+    const box = view.querySelector("#runningBox");
+    if (box) box.hidden = n === 0;
+    repaintCardStates();
   } else {
     renderOthersBanner();
   }
+}
+
+function repaintCardStates() {
+  view.querySelectorAll(".card[data-id]").forEach((c) => {
+    const l = STATE.labs.find((x) => x.id === c.dataset.id);
+    if (!l) return;
+    c.querySelector(".card__state").innerHTML = cardStateHTML(l);
+    c.classList.toggle("card--done", !!l.completed);
+  });
+}
+
+/* ---------- contador de completados (nav + inicio) ---------- */
+function progressCounts() {
+  const avail = STATE.labs.filter((l) => l.exists);
+  return { done: avail.filter((l) => l.completed).length, total: avail.length };
+}
+
+function paintProgress() {
+  const { done, total } = progressCounts();
+  const label = `${done} de ${total} labs completados`;
+  const chip = document.querySelector('.chip[data-route="progreso"]');
+  if (chip) {
+    chip.setAttribute("aria-label", `Progreso: ${label}`);
+    chip.title = label;
+    const cnt = chip.querySelector(".chip__count");
+    cnt.classList.toggle("has-done", done > 0);
+    cnt.innerHTML = `${done > 0 ? checkIcon() : ""}${done}/${total}`;
+  }
+  const home = view.querySelector("#homeProgress");
+  if (home) home.innerHTML = homeProgressHTML(done, total);
+}
+
+function homeProgressHTML(done, total) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return `<a class="home-progress" href="#progreso" aria-label="Ver progreso: ${done} de ${total} labs completados">
+    <span class="done-mark${done ? "" : " done-mark--empty"}" aria-hidden="true">${checkIcon()}</span>
+    <span class="home-progress__text"><strong>${done}</strong> de ${total} labs completados</span>
+    <span class="prog-bar" aria-hidden="true"><span style="width:${pct}%"></span></span>
+    <span class="home-progress__pct">${pct}%</span>
+    <span class="home-progress__link">Ver progreso →</span>
+  </a>`;
+}
+
+/* El sondeo trae 'completed' del servidor: refleja también los labs resueltos
+   desde la terminal o con lab.sh. Devuelve los ids recién completados. */
+function syncCompleted(map) {
+  if (!map) return [];
+  const nuevos = [];
+  let changed = false;
+  STATE.labs.forEach((l) => {
+    const c = map[l.id] || null;
+    const prev = l.completed;
+    if (!prev && c) nuevos.push(l.id);
+    if ((prev && prev.count) !== (c && c.count)) changed = true;
+    l.completed = c;
+  });
+  if (changed) {
+    paintProgress();
+    if (STATE.view === "home") repaintCardStates();
+    const cur = STATE.labs.find((x) => x.id === STATE.view);
+    if (cur) paintDetailDone(cur);
+  }
+  return nuevos;
+}
+
+function paintDetailDone(l) {
+  const el = view.querySelector("#doneBadge");
+  if (el) el.innerHTML = doneBadge(l);
 }
 
 /* En la vista de detalle: aviso si hay OTROS labs corriendo. */
@@ -444,7 +641,7 @@ function setNav(section) {
 }
 
 /* ---------- progreso (registro SQLite de labs completados) ---------- */
-const ORIGEN = { web: "Validar (web)", terminal: "check.sh (terminal)", red: "Banderas (red)", manual: "Marcada a mano" };
+const ORIGEN = { web: "Validar (web)", terminal: "check.sh (terminal)", red: "Banderas (red)", manual: "Marcada a mano", arena: "Arena" };
 
 /* "2026-11-18T18:12:37-06:00" -> "18/11/2026 18:12" */
 function fmtDate(iso) {
@@ -475,6 +672,7 @@ async function renderProgress() {
     a.count += 1;
   }
   STATE.labs.forEach((l) => { l.completed = agg[l.id] || null; });
+  paintProgress();
 
   const avail = STATE.labs.filter((l) => l.exists);
   const doneIds = new Set(Object.keys(agg));
@@ -511,6 +709,7 @@ async function renderProgress() {
       <div class="prog-stat"><strong>${nDone}</strong><span>de ${avail.length} labs completados</span></div>
       <div class="prog-stat"><strong>${pct}%</strong><span>del total</span></div>
       <div class="prog-stat"><strong>${d.history.length}</strong><span>validaciones registradas</span></div>
+      <div class="prog-stat"><strong>${STATE.labs.filter((l) => l.arena && l.arena.wins).length}</strong><span>labs superados en arena · ${STATE.labs.reduce((n, l) => n + ((l.arena && l.arena.losses) || 0), 0)} derrotas</span></div>
     </div>
     <div class="section-label">Por pista</div>
     <div class="prog-tracks">${tracks}</div>
@@ -591,24 +790,47 @@ async function renderCourse(id) {
   view.querySelector("#mdCurso").innerHTML = txt ? md(txt) : "No disponible.";
 }
 
+/* Aviso permanente del inicio: los labs con contenedor necesitan Docker Desktop. */
+const dockerNoticeHTML = `<div class="notice notice--info" role="note">
+  <svg class="notice__icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.7" r=".95" fill="currentColor"/></svg>
+  <span><strong>Asegúrate de tener Docker Desktop habilitado</strong> antes de iniciar un lab.</span>
+</div>`;
+
 function renderHome() {
   STATE.view = "home";
   setHash("");
   setNav("home");
-  const labs = STATE.labs.filter((l) => STATE.filter === "all" || l.track === STATE.filter);
+  const arena = STATE.arena;
+  // En arena no hay guías sin contenedor: no hay nada que validar desde aquí.
+  const labs = STATE.labs.filter((l) => (STATE.filter === "all" || l.track === STATE.filter)
+    && !(arena && l.local));
   const byTrack = Object.fromEntries(Object.keys(TRACKS).map((t) => [t, []]));
   labs.forEach((l) => (byTrack[l.track] ||= []).push(l));
-  const trackHTML = (t) => (STATE.filter === "all" || STATE.filter === t)
+  const trackHTML = (t) => (STATE.filter === "all" || STATE.filter === t) && !(arena && !byTrack[t].length)
     ? `<div class="section-label">${TRACKS[t]}</div>
     <div class="grid">${byTrack[t].map(cardHTML).join("") || '<p class="empty">Sin labs en esta pista.</p>'}</div>` : "";
 
   view.innerHTML = `
-    <section class="hero">
-      <h1>Laboratorio de defensa en Linux</h1>
-      <p>Escenarios reales de detección, respuesta a incidentes y hardening. Levanta un contenedor con un botón, abre la terminal en el navegador y valida tu solución. Todo local e inofensivo.</p>
+    ${arena ? `<section class="hero">
+      <div class="hero__eyebrow">⚔ Modo arena</div>
+      <h1>Tú contra la terminal</h1>
+      <p>Los mismos labs, sin ayuda: ni resolución guiada, ni solución, ni pistas. Sólo el enunciado y la consola. Tienes ${ARENA_TRIES} intentos de Validar por lab; al ${ARENA_TRIES}.º fallo, fuera.</p>
     </section>
-    <div class="section-label" id="runningLabel">En ejecución</div>
-    <div id="runningSlot">${runningPanelHTML()}</div>
+    <div id="arenaSummary">${arenaSummaryHTML()}</div>` : `<section class="hero">
+      <h1>Laboratorio de defensa en Linux</h1>
+      <p>Escenarios reales de detección, respuesta a incidentes y hardening, en contenedores de tu propia máquina. Todo local e inofensivo.</p>
+      <ol class="steps" aria-label="Cómo empezar">
+        <li><span class="steps__n" aria-hidden="true">1</span>Elige un lab de la lista</li>
+        <li><span class="steps__n" aria-hidden="true">2</span>Pulsa <strong>▶ Iniciar</strong></li>
+        <li><span class="steps__n" aria-hidden="true">3</span>Resuélvelo en la terminal y pulsa <strong>✓ Validar</strong></li>
+      </ol>
+    </section>
+    <div id="homeProgress">${homeProgressHTML(progressCounts().done, progressCounts().total)}</div>`}
+    ${dockerNoticeHTML}
+    <div id="runningBox"${runningLabs().length ? "" : " hidden"}>
+      <div class="section-label" id="runningLabel">En ejecución</div>
+      <div id="runningSlot">${runningPanelHTML()}</div>
+    </div>
     ${Object.keys(TRACKS).map(trackHTML).join("")}
   `;
 
@@ -630,7 +852,7 @@ function renderLocal(l) {
         <div class="card__id">GUÍA ${l.id} · ${TRACKS[l.track]}</div>
         <h1 class="detail__title">${esc(l.name)}</h1>
         ${l.description ? `<p class="detail__desc">${esc(l.description)}</p>` : ""}
-        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)} <span id="localDone" class="muted"></span></div>
+        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)} <span id="doneBadge">${doneBadge(l)}</span></div>
       </div>
       <div class="detail__actions">
         <button class="btn" id="btnLocalDone" title="Guarda la guía en tu registro de progreso">Marcar como completada</button>
@@ -649,11 +871,7 @@ function renderLocal(l) {
     <div class="panel" data-panel="sol"><div class="md" id="mdSol">Cargando…</div></div>
   `;
   view.querySelector("#back").addEventListener("click", (e) => { e.preventDefault(); renderHome(); });
-  const doneEl = view.querySelector("#localDone");
-  const paintDone = () => {
-    doneEl.textContent = l.completed ? `✓ completada ${l.completed.count}× · última ${fmtDate(l.completed.last)}` : "";
-  };
-  paintDone();
+  const paintDone = () => { paintDetailDone(l); paintProgress(); };
   view.querySelector("#btnLocalDone").addEventListener("click", async (e) => {
     const b = e.currentTarget;
     b.disabled = true;
@@ -687,31 +905,36 @@ async function renderDetail(id) {
   setHash("#lab/" + id);
   setNav("home");
   window.scrollTo(0, 0);
+  // Arena si el modo global está activo o si este lab tiene una partida en curso.
+  const arena = arenaOn(l);
 
   view.innerHTML = `
     <a class="detail__back" href="#" id="back">← Todos los labs</a>
     <div class="detail__head">
       <div>
-        <div class="card__id">LAB ${l.id} · ${TRACKS[l.track]}</div>
+        <div class="card__id">${arena ? "ARENA · " : ""}LAB ${l.id} · ${TRACKS[l.track]}</div>
         <h1 class="detail__title">${esc(l.name)}</h1>
         ${l.description ? `<p class="detail__desc">${esc(l.description)}</p>` : ""}
-        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)} <span id="modeBadge"></span> <span id="statusText">comprobando…</span></div>
+        <div class="detail__meta">${catsHTML(l)} ${diffDots(l.difficulty)} ${arena
+          ? `<span id="arenaState">${arenaStateHTML(l)}</span>`
+          : `<span id="doneBadge">${doneBadge(l)}</span>`} <span id="modeBadge"></span> <span id="statusText">comprobando…</span></div>
       </div>
     </div>
-    ${helpHTML(l)}
+    ${arena ? arenaNoticeHTML(l) : helpHTML(l)}
     <div id="lifeBanner"></div>
     <div id="othersBanner"></div>
     <div class="toolbar">
-      <button class="btn btn--primary" id="btnStart">▶ Iniciar</button>
+      <button class="btn btn--primary" id="btnStart">${arena ? "⚔ Iniciar en arena" : "▶ Iniciar"}</button>
       <button class="btn" id="btnCheck">✓ Validar</button>
       <button class="btn" id="btnReset">↻ Reiniciar</button>
       <button class="btn btn--danger" id="btnStop">■ Detener</button>
+      ${arena ? `<button class="btn btn--danger" id="btnAbandon"${arenaRun(l) ? "" : " hidden"}>Abandonar partida</button>` : ""}
     </div>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-panel="reto" aria-selected="true">Reto</button>
       <button class="tab" role="tab" data-panel="term">Terminal</button>
       <button class="tab" role="tab" data-panel="check">Validación</button>
-      <button class="tab" role="tab" data-panel="sol">Solución</button>
+      ${arena ? "" : `<button class="tab" role="tab" data-panel="sol">Solución</button>`}
     </div>
     <div class="panel active" data-panel="reto"><div class="md" id="mdReto">Cargando…</div></div>
     <div class="panel" data-panel="term">
@@ -720,7 +943,7 @@ async function renderDetail(id) {
           <div class="brief__head">
             <div class="brief__tabs" role="tablist" aria-label="Lateral del LAB ${l.id}">
               <button class="brief__tab" role="tab" data-brief-tab="reto" aria-selected="true">Enunciado</button>
-              <button class="brief__tab" role="tab" data-brief-tab="guia" aria-selected="false" title="Paso a paso explicado: cómo pensar y actuar">Guiada</button>
+              ${arena ? "" : `<button class="brief__tab" role="tab" data-brief-tab="guia" aria-selected="false" title="Paso a paso explicado: cómo pensar y actuar">Guiada</button>`}
             </div>
             <button class="linkbtn" data-brief-check title="Validar la solución">✓ Validar</button>
             <button class="linkbtn" data-brief-toggle title="Ocultar lateral">Ocultar ⇤</button>
@@ -728,14 +951,14 @@ async function renderDetail(id) {
           <div class="brief__scroll">
             <pre class="output" id="briefCheck" hidden></pre>
             <div class="md brief__body" id="mdBrief" data-brief-pane="reto">Cargando…</div>
-            <div class="md brief__body" id="mdGuia" data-brief-pane="guia" hidden>Cargando…</div>
+            ${arena ? "" : `<div class="md brief__body" id="mdGuia" data-brief-pane="guia" hidden>Cargando…</div>`}
           </div>
         </aside>
         <div class="workspace__term" id="termSlot"></div>
       </div>
     </div>
     <div class="panel" data-panel="check"><p class="empty" id="checkEmpty">Pulsa <strong>Validar</strong> con el lab activo para ver el resultado.</p><pre class="output" id="checkOut" style="display:none"></pre></div>
-    <div class="panel" data-panel="sol"><div class="md" id="mdSol">Cargando…</div></div>
+    ${arena ? "" : `<div class="panel" data-panel="sol"><div class="md" id="mdSol">Cargando…</div></div>`}
   `;
 
   view.querySelector("#back").addEventListener("click", (e) => { e.preventDefault(); renderHome(); });
@@ -751,17 +974,18 @@ async function renderDetail(id) {
   view.querySelector("[data-brief-toggle]").addEventListener("click", () => toggleBrief(false));
   view.querySelector("[data-brief-check]").addEventListener("click", () => view.querySelector("#btnCheck").click());
   view.querySelectorAll("[data-brief-tab]").forEach((b) => b.addEventListener("click", () => showBriefTab(b.dataset.briefTab)));
-  showBriefTab(briefTab());
+  if (!arena) showBriefTab(briefTab());
 
-  // contenido markdown (el enunciado va también al lateral de la pestaña Terminal)
-  api(`/api/labs/${id}/reto`).then((d) => {
+  // contenido markdown (el enunciado va también al lateral de la pestaña Terminal).
+  // En arena el servidor lo devuelve sin pistas y no sirve guía ni solución.
+  api(`/api/labs/${id}/reto${arena ? "?arena=1" : ""}`).then((d) => {
     const html = d.markdown ? md(d.markdown) : "No disponible.";
     view.querySelector("#mdReto").innerHTML = html;
     view.querySelector("#mdBrief").innerHTML = html;
   });
-  api(`/api/labs/${id}/solucion`).then((d) => { view.querySelector("#mdSol").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
+  if (!arena) api(`/api/labs/${id}/solucion`).then((d) => { view.querySelector("#mdSol").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
     .catch(() => { view.querySelector("#mdSol").textContent = "No disponible."; });
-  api(`/api/labs/${id}/guia`).then((d) => { view.querySelector("#mdGuia").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
+  if (!arena) api(`/api/labs/${id}/guia`).then((d) => { view.querySelector("#mdGuia").innerHTML = d.markdown ? md(d.markdown) : "No disponible."; })
     .catch(() => { view.querySelector("#mdGuia").textContent = "Este lab aún no tiene resolución guiada."; });
 
   // acciones
@@ -794,21 +1018,30 @@ async function renderDetail(id) {
 
   // Elección de modo (solo labs red-capaces). Se recuerda para reiniciar.
   const preStart = async () => {
+    if (arena) return "?arena=1";   // arena = blue, sin elegir modo
     if (!l.redCapable) return "";
     const m = await askMode(l);
     if (!m) return null;
     l.chosenMode = m;
     return m === "red" ? "?mode=red" : "";
   };
-  const preReset = async () =>
-    (l.redCapable && l.chosenMode === "red") ? "?mode=red" : "";
+  const preReset = async () => arena ? "?arena=1"
+    : (l.redCapable && l.chosenMode === "red") ? "?mode=red" : "";
 
+  const afterArena = (r) => {
+    if (!arena || r.arena === undefined) return;
+    l.arena = r.arena; paintArenaState(l);
+    const abBtn = view.querySelector("#btnAbandon");
+    if (abBtn) abBtn.hidden = !arenaRun(l);
+  };
   bind("#btnStart", "Iniciando…", "start", (r) => {
-    toast(r.ok ? "Lab iniciado" : "Fallo al iniciar");
+    afterArena(r);
+    toast(r.ok ? (arena ? "Arena iniciada: suerte" : "Lab iniciado") : "Fallo al iniciar");
     if (r.ok) { l.mode = r.mode; applyMode(l); switchTab("term"); mountTerminal(l); }
     else showCheck(r.output, false);
   }, preStart);
   bind("#btnReset", "Reiniciando…", "reset", (r) => {
+    afterArena(r);
     if (r.ok) { l.mode = r.mode; applyMode(l); }
     toast(r.ok ? "Escenario re-plantado" : "Fallo al reiniciar");
   }, preReset);
@@ -816,24 +1049,65 @@ async function renderDetail(id) {
   const preCheck = async () => {
     // En red no se ejecuta check.sh: se entregan banderas en el panel de captura.
     if (l.mode === "red") { switchTab("check"); renderCapture(l); return false; }
+    const run = arena && arenaRun(l);
+    if (run && run.left === 1) {
+      const go = await askArena("Último intento",
+        `Si esta validación de <strong>LAB ${l.id} · ${esc(l.name)}</strong> falla, quedas fuera de la arena y el lab se destruye.`,
+        "Validar");
+      if (!go) return false;
+    }
     return "";
   };
   bind("#btnCheck", "Validando…", "check", (r) => {
+    // Error del servidor o lab parado: no ha contado como intento.
+    if (r.error && !r.output) { toast(r.error); return; }
+    afterArena(r);
     // Desde la terminal no se cambia de pestaña: el resultado sale encima del enunciado.
     if (!termVisible()) switchTab("check");
     showCheck(r.output || "(sin salida)", r.ok);
-    toast(r.ok ? "¡Resuelto! 🎉" : "Aún faltan objetivos");
+    if (arena && r.eliminated) {
+      toast(`✗ Fuera: ${ARENA_TRIES} fallos. El lab se destruye`);
+      closePopout(l.id); l.running = false; l.mode = null; applyMode(l); l.destroyIn = null; clearTerminal(l);
+      switchTab("check");
+      // El servidor destruye en segundo plano: se vuelve a preguntar al terminar.
+      setTimeout(() => { if (STATE.view === l.id) refreshStatus(l); }, 5000);
+      return;
+    }
+    if (arena && !r.ok && r.run) {
+      toast(`✗ No superado · ${r.run.left === 1 ? "te queda el último intento" : `te quedan ${r.run.left} intentos`}`);
+      return;
+    }
+    toast(r.ok ? (arena ? "🏆 Arena superada" : "¡Resuelto! 🎉") : "Aún faltan objetivos");
     if (r.ok) {
       const prev = l.completed || { count: 0 };
       l.completed = { count: prev.count + 1, last: new Date().toISOString().slice(0, 19) };
+      paintDetailDone(l); paintProgress();
       l.destroyIn = r.destroyIn; renderLifeBanner(); updateRunningUI(true);
     }
   }, preCheck);
 
+  const ab = view.querySelector("#btnAbandon");
+  if (ab) ab.addEventListener("click", async () => {
+    const go = await askArena("Abandonar la partida",
+      `Abandonar cuenta como derrota en <strong>LAB ${l.id}</strong> y destruye el lab. Después puedes empezar una partida nueva.`,
+      "Abandonar");
+    if (!go) return;
+    ab.disabled = true;
+    try {
+      const r = await api(`/api/labs/${id}/abandon`, "POST");
+      if (r.ok) {
+        afterArena(r); toast("Partida abandonada");
+        closePopout(l.id); l.running = false; l.mode = null; applyMode(l); l.destroyIn = null; clearTerminal(l);
+      } else toast(r.error || "No se pudo abandonar");
+    } catch (e) { toast("Error: " + e.message); }
+    ab.disabled = false;
+    refreshStatus(l); refreshRunning();
+  });
+
   renderOthersBanner();
   renderLifeBanner();
   refreshStatus(l);
-  Notes.attach(l);
+  if (!arena) Notes.attach(l);   // en arena, sin bloc de notas: sólo enunciado y consola
 }
 
 function switchTab(panel) {
@@ -866,6 +1140,14 @@ async function refreshStatus(l) {
     l.expiresIn = s.running ? s.expiresIn : null;
     if (s.redCapable != null) l.redCapable = s.redCapable;
     l.mode = s.running ? s.mode : null;
+    if (s.arena !== undefined) {
+      const hadRun = !!arenaRun(l);
+      l.arena = s.arena; paintArenaState(l);
+      const abBtn = view.querySelector("#btnAbandon");
+      if (abBtn) abBtn.hidden = !arenaRun(l);
+      // Partida en curso abierta desde el modo normal: se vuelve a pintar en arena.
+      if (!hadRun && arenaRun(l) && !view.querySelector("#arenaState") && STATE.view === l.id) return renderDetail(l.id);
+    }
     const st = view.querySelector("#statusText");
     if (st) st.innerHTML = s.running
       ? '<span class="badge live"><span class="dot"></span>activo</span>'
@@ -882,7 +1164,7 @@ async function refreshStatus(l) {
 function applyMode(l) {
   const red = l.mode === "red";
   const mb = view.querySelector("#modeBadge");
-  if (mb) mb.innerHTML = l.mode
+  if (mb) mb.innerHTML = (l.mode && !arenaOn(l))
     ? `<span class="mbadge mbadge--${l.mode}">${red ? "🔴 RED" : "🔵 BLUE"}</span>` : "";
   const checkTab = view.querySelector('.tab[data-panel="check"]');
   if (checkTab) checkTab.textContent = red ? "Capturar" : "Validación";
@@ -1293,6 +1575,10 @@ function initFilters() {
   document.addEventListener("click", (e) => { if (!menu.contains(e.target)) setOpen(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) { setOpen(false); btn.focus(); } });
   document.querySelector('.chip[data-route="cursos"]').addEventListener("click", renderCourses);
+  document.querySelector('.chip[data-route="arena"]').addEventListener("click", () => {
+    setArena(!STATE.arena);
+    toast(STATE.arena ? "⚔ Modo arena: sin ayudas, 3 intentos por lab" : "Modo normal");
+  });
   document.querySelector('.chip[data-route="progreso"]').addEventListener("click", renderProgress);
   // Enlaces internos (#cursos, #curso/NN, #lab/NN) y botones atrás/adelante.
   window.addEventListener("hashchange", route);
@@ -1311,6 +1597,9 @@ function initPolling() {
 
 async function boot() {
   initTheme();
+  STATE.arena = loadArenaPref();
+  document.documentElement.toggleAttribute("data-arena", STATE.arena);
+  document.querySelector('.chip[data-route="arena"]').setAttribute("aria-pressed", STATE.arena);
   initFilters();
   try {
     const [d, c] = await Promise.all([
@@ -1320,8 +1609,9 @@ async function boot() {
     STATE.labs = d.labs;
     STATE.cursos = c.cursos || [];
     buildTrackMenu();
+    paintProgress();
     loadPopouts(); // pestañas de terminal abiertas antes de recargar
-    route(); // abre directamente la vista de la URL (p.ej. /#cursos)
+    renderHome(); // al abrir la web siempre se ve la lista de labs (no la última vista de la URL)
     initPolling();
   } catch (e) {
     view.innerHTML = `<div class="empty">No se pudo contactar el backend. ¿Corriste <code>python3 server.py</code>?<br><small>${esc(e.message)}</small></div>`;

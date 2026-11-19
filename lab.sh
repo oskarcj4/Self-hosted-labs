@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Helper para manejar los labs de TerminalCero Lab.
+# Helper para manejar los labs de Self-hosted-labs.
 #
 # Auto-destrucción (igual que la web): `check` que pasa destruye el lab; al
 # salir de la sesión de `start` el lab se destruye (si está resuelto, siempre;
@@ -12,7 +12,7 @@ MARKER=/tmp/.tclab-solved
 
 usage() {
   cat <<EOF
-TerminalCero Lab
+Self-hosted-labs
 
 Uso: ./lab.sh <comando> [lab]
 
