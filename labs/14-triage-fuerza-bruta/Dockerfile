@@ -1,7 +1,7 @@
 FROM debian:12-slim
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      procps grep gawk coreutils \
+      procps grep gawk coreutils python3 \
       vim-tiny nano less curl \
       sudo ca-certificates \
     && rm -rf /var/lib/apt/lists/*
