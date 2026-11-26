@@ -42,15 +42,18 @@ dejado caer: `fsociety00.dat`.
 ## Comandos que te pueden servir
 
 ```bash
+# ¿Qué IP pide más veces "/"? (cuenta peticiones por IP, de más a menos)
 sudo awk '$7=="/"{print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head
-sudo head -1 /var/log/nginx/access.log; sudo grep -m1 '10.143.0.66' /var/log/nginx/access.log   # inicio del flood
-sudo find / -xdev -newermt "$(date +%F) 02:10" ! -newermt "$(date +%F) 02:20" -type f 2>/dev/null | grep -v /proc
-ls -la --time-style=full-iso /etc/cron.d/; cat /etc/cron.d/fsociety; stat /opt/allsafe/.fsociety/fsociety00.dat
+# Primera petición de una IP concreta = hora de inicio del flood
+sudo grep -m1 '^<IP> ' /var/log/nginx/access.log
+# Ficheros modificados en una ventana de tiempo (aquí, 02:10–02:20 de hoy)
+sudo find / -xdev -type f -newermt "$(date +%F) 02:10" ! -newermt "$(date +%F) 02:20" 2>/dev/null
+stat -c '%y  %n' <fichero>                        # fecha de modificación exacta
 sudo nano /etc/nginx/conf.d/limites.conf          # zonas: contexto http
 sudo nano /etc/nginx/sites-available/allsafe      # limit_req / limit_conn dentro de location /
-sudo nginx -t && sudo systemctl reload nginx
-sha256sum /opt/allsafe/.fsociety/fsociety00.dat
-sudo rm /etc/cron.d/fsociety /usr/local/bin/fsociety-beacon && sudo systemctl restart cron
+sudo nginx -t && sudo systemctl reload nginx      # valida y aplica sin cortar
+sha256sum <fichero>
+hey -z 5s -c 20 http://127.0.0.1/                 # carga de prueba: mide 200 vs 429
 ```
 
 > Un límite por IP no para una botnet real con miles de IP: ahí entran CDN,

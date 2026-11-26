@@ -26,23 +26,20 @@ server {
     root /var/www/allsafe;
     index index.html;
 
-    # location / {              # <-- aquí irá tu limit_req / limit_conn
-    #     try_files $uri $uri/ =404;
-    # }
+    # Páginas: aquí van tus limit_req / limit_conn (dentro de estas llaves).
     location / {
         try_files $uri $uri/ =404;
     }
 
+    # Estáticos: se quedan sin límite.
     location /static/ {
     }
 }
 N
-rm -f /etc/nginx/sites-enabled/default
-ln -sf /etc/nginx/sites-available/allsafe /etc/nginx/sites-enabled/allsafe
-systemctl enable --now nginx
-
 # --- registro histórico de la inundación (empezó a las 02:11) -----------------
-# El bot en vivo seguirá añadiendo líneas; estas fijan el inicio para la timeline.
+# Se escribe ANTES de arrancar nginx: así las líneas de 02:11 son las primeras
+# del fichero y el bot en vivo añade detrás. Si nginx arrancara antes, el bot
+# colaría líneas con la hora actual delante y 'grep -m1' daría una hora falsa.
 {
   for s in $(seq 11 19); do
     for i in $(seq 1 25); do
@@ -54,6 +51,10 @@ systemctl enable --now nginx
 for ip in 10.143.0.21 10.143.0.22; do
   printf '%s - - [%s:09:03:12 +0000] "GET / HTTP/1.1" 200 64 "-" "Mozilla/5.0"\n' "$ip" "$DIA" >> /var/log/nginx/access.log
 done
+
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/allsafe /etc/nginx/sites-enabled/allsafe
+systemctl enable --now nginx
 
 # --- persistencia plantada DURANTE la inundación (02:14) ----------------------
 install -d -m 0755 /opt/allsafe/.fsociety

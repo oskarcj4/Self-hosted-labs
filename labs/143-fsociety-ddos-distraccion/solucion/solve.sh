@@ -41,5 +41,5 @@ chown analista:analista $H/hallazgos.txt $H/timeline.txt
 # 4) Erradica la persistencia, conserva el .dat
 rm -f /etc/cron.d/fsociety /usr/local/bin/fsociety-beacon
 systemctl restart cron
-pkill -f fsociety-beacon 2>/dev/null || true
+pkill -f '[f]society-beacon' 2>/dev/null || true
 echo "solve.sh completado."

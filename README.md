@@ -364,6 +364,7 @@ labs/NN-nombre/
 ├── setup/plant.sh       # planta el escenario roto
 ├── check.sh             # validador: sale 0 si todo OK y deja la marca de "resuelto"
 └── solucion/
+    ├── GUIA.md          # resolución guiada (formato en GUIA-ESTILO.md)
     ├── SOLUCION.md      # el paso a paso explicado
     └── solve.sh         # solución automática (sirve para probar el lab)
 ```
