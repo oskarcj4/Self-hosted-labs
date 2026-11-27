@@ -8,14 +8,23 @@ golpe no se lleve también la copia (inmutable, fuera de sitio).
 ## Paso 1 · Restaura desde restic
 
 :::pista Cómo hacerlo
+La contraseña del repositorio (`/etc/restic/pass`) sólo la lee root, y
+`/srv/datos` es de root: hace falta `sudo`. Como `sudo` no pasa tus variables
+de entorno al comando, se las das con `env`:
 ```bash
-export RESTIC_REPOSITORY=/srv/backup/restic
-export RESTIC_PASSWORD_FILE=/etc/restic/pass
-restic snapshots
-restic restore latest --target /
-sha256sum /srv/datos/master.key
+R="env RESTIC_REPOSITORY=/srv/backup/restic RESTIC_PASSWORD_FILE=/etc/restic/pass restic"
+sudo $R snapshots
+sudo $R restore latest --target /
+sudo rm /srv/datos/LEEME.txt
+ls -l /srv/datos; sudo sha256sum /srv/datos/master.key
 ```
-`--target /` devuelve los ficheros a su ruta original (`/srv/datos/...`).
+- **restic** guarda copias deduplicadas y cifradas; cada copia es una
+  instantánea (*snapshot*). `snapshots` las lista.
+- `restore latest --target /`: restaura la última instantánea partiendo de
+  `/`, así cada fichero vuelve a su ruta original (`/srv/datos/...`).
+- `LEEME.txt` es la nota del atacante: no forma parte de los datos.
+
+**Qué deberías ver:** `master.key` y `claves.gpg` de vuelta, sin la nota.
 :::
 
 ## Paso 2 · Copia inmutable fuera de sitio

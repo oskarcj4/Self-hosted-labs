@@ -28,11 +28,11 @@ borrable, el siguiente ataque también se la lleva.
 ## Comandos que te pueden servir
 
 ```bash
-export RESTIC_REPOSITORY=/srv/backup/restic
-export RESTIC_PASSWORD_FILE=/etc/restic/pass
-restic snapshots
-restic restore latest --target /          # restaura /srv/datos en su sitio
-sha256sum /srv/datos/master.key
+# la contraseña del repositorio sólo la lee root; sudo no hereda tus variables:
+R="env RESTIC_REPOSITORY=/srv/backup/restic RESTIC_PASSWORD_FILE=/etc/restic/pass restic"
+sudo $R snapshots
+sudo $R restore latest --target /          # restaura /srv/datos en su sitio
+sudo sha256sum /srv/datos/master.key
 sudo cp -a /srv/backup/restic /srv/offsite/restic
 sudo chattr -R +i /srv/offsite/restic     # inmutable
 lsattr -d /srv/offsite/restic

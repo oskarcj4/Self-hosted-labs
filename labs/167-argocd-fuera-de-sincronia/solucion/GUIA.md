@@ -12,7 +12,17 @@ bueno. Primero el diff; luego llevas a git lo que se queda; y sólo entonces syn
 argocd --core app diff tienda
 kubectl -n argocd get app tienda -o jsonpath='{range .status.resources[*]}{.kind}/{.name}: {.status}{"\n"}{end}'
 ```
-`Deployment/tienda` (replicas 5, env MODO_DEBUG) y `ConfigMap/tienda-web` (mensaje).
+- `argocd --core` usa la CLI de Argo CD hablando directamente con Kubernetes,
+  sin servidor de API. `app diff` compara lo que hay en el clúster con lo que
+  dice git.
+- La plantilla `jsonpath` recorre (`range`) los recursos de la Application y
+  enseña el estado de sincronía de cada uno.
+
+**Qué deberías ver:** `Deployment/tienda` (5 réplicas y la variable
+`MODO_DEBUG`) y `ConfigMap/tienda-web` (el mensaje) en `OutOfSync`. Apúntalo:
+```bash
+printf 'deployment/tienda\nconfigmap/tienda-web\n' > ~/drift.txt
+```
 :::
 
 ## Paso 2 · El cambio bueno, a git
