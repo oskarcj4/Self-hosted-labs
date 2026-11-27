@@ -1,6 +1,10 @@
 # Solución — Lab 84
 
 ```bash
+# 0) evidencia (los logs de Apache sólo los lee root/adm)
+sudo awk '{print $1}' /var/log/apache2/access.log | cut -d. -f1-3 | sort | uniq -c | sort -rn | head
+sudo awk '{print $4}' /var/log/apache2/access.log | sort | sed -n '1p;$p'
+
 # 1) mitigación: bloquear rangos confirmados...
 while read -r net; do
   [ -n "$net" ] && sudo iptables -I INPUT -s "$net" -j DROP
@@ -15,13 +19,14 @@ sudo iptables -A INPUT -p tcp --dport 80 -m conntrack --ctstate NEW \
 cat > /home/analista/postmortem.md <<'EOF'
 # Postmortem — DDoS web-84
 ## Impacto
-~40 min de 503 en /buscar; sin pérdida de datos.
-## Cronología
-11:30 pico; 11:35 saturación; 11:40 triage; 11:50 mitigado.
+800 peticiones a /buscar con 503 entre 11:30 y 11:35 UTC, desde 80 IP de
+203.0.113.0/24 y 198.51.100.0/24. Sin pérdida de datos.
+## Cronología (access.log)
+11:30:00 primera petición del ataque; 11:35:05 última; rangos confirmados en la blocklist.
 ## Mitigación
 Bloqueo de 203.0.113.0/24 y 198.51.100.0/24 + hashlimit 25/s por IP en el 80.
 ## Prevención
-Rate limit en reverse proxy, mod_evasive/reqtimeout, alerta por 5xx, evaluar CDN.
+Persistir reglas (iptables-save), rate limit en reverse proxy, alerta por 5xx, evaluar CDN.
 EOF
 
 # 3) verificar servicio

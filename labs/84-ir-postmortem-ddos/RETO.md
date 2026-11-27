@@ -25,7 +25,7 @@ incidente **de verdad**: mitigación duradera + postmortem.
 
 ```bash
 cat /etc/ddos/blocklist.txt
-awk '{print $1}' /var/log/apache2/access.log | cut -d. -f1-3 | sort | uniq -c | sort -rn | head
+sudo awk '{print $1}' /var/log/apache2/access.log | cut -d. -f1-3 | sort | uniq -c | sort -rn | head
 
 # bloquear rangos de la blocklist
 while read -r net; do [ -n "$net" ] && sudo iptables -I INPUT -s "$net" -j DROP; done < /etc/ddos/blocklist.txt
