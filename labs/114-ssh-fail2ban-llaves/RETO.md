@@ -31,7 +31,8 @@ grep "Failed password" /var/log/auth.log.1 | awk '{print $(NF-3)}' | sort | uniq
 sudo tail -f /var/log/auth.log
 sudo nano /etc/fail2ban/jail.local     # [sshd] enabled/maxretry...
 sudo fail2ban-client status sshd
-ssh-keygen -t ed25519 ; cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519   # sin passphrase: el validador entra sin teclear
+cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
 sudo sshd -t ; sudo sshd -T | grep -i authentication
 ```
 

@@ -12,6 +12,7 @@ se dejó caer `/opt/allsafe/.fsociety/fsociety00.dat`.
 ```bash
 # 1) ¿Quién inunda?
 sudo awk '$7=="/"{print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -3
+sudo grep -m1 '^10\.143\.0\.66 ' /var/log/nginx/access.log   # primera línea -> 02:11
 
 # 2) Limita la raíz por IP, 429 al pasarse
 sudo tee /etc/nginx/conf.d/limites.conf <<'N'
@@ -27,10 +28,10 @@ sudo nano /etc/nginx/sites-available/allsafe
 #       try_files $uri $uri/ =404;
 #   }
 sudo nginx -t && sudo systemctl reload nginx
-sudo tail -f /var/log/nginx/access.log | grep ' 429 '   # el bot ya recibe 429
+sudo tail -n 5 /var/log/nginx/access.log   # el bot ya recibe 429
 
 # 3) Caza la persistencia plantada entre las 02:10 y las 02:20
-sudo find / -xdev -newermt "$(date +%F) 02:10" ! -newermt "$(date +%F) 02:20" -type f 2>/dev/null | grep -v -e /proc -e /sys
+sudo find / -xdev -type f -newermt "$(date +%F) 02:10" ! -newermt "$(date +%F) 02:20" 2>/dev/null
 cat /etc/cron.d/fsociety                      # -> /usr/local/bin/fsociety-beacon
 stat /opt/allsafe/.fsociety/fsociety00.dat    # modificado 02:14
 
@@ -53,7 +54,7 @@ T
 # 5) Erradica la persistencia (conserva el .dat como evidencia)
 sudo rm -f /etc/cron.d/fsociety /usr/local/bin/fsociety-beacon
 sudo systemctl restart cron
-sudo pkill -f fsociety-beacon 2>/dev/null || true
+pgrep -af '[f]society-beacon' || echo "no hay beacon corriendo"   # el beacon no se queda vivo
 
 bash /opt/lab/check.sh
 ```

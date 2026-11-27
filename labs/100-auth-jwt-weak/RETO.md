@@ -45,8 +45,10 @@ bash /opt/lab/check.sh blue
 T=$(curl -s --data-urlencode user=ana --data-urlencode password=Primavera2024 \
       http://127.0.0.1:8080/login | sed -n 's/^token=//p')
 curl -s -H "Authorization: Bearer $T" http://127.0.0.1:8080/me
-# mira las 3 partes del token (base64url). ¿qué dice la cabecera "alg"?
-echo "$T" | cut -d. -f1 | base64 -d 2>/dev/null
+# mira las 3 partes del token (base64url, sin relleno '='). ¿qué dice la cabecera "alg"?
+b64url(){ python3 -c 'import sys,base64; s=sys.argv[1]; print(base64.urlsafe_b64decode(s+"="*(-len(s)%4)).decode())' "$1"; }
+b64url "$(echo "$T" | cut -d. -f1)"     # cabecera
+b64url "$(echo "$T" | cut -d. -f2)"     # payload
 ```
 
 ## Cuando creas que terminaste

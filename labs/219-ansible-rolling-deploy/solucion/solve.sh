@@ -45,8 +45,8 @@ cat > deploy.yml <<'YML'
         awk -F, '$1=="{{ haproxy_backend }}" && $2=="{{ inventory_hostname }}" {print $5}'
       register: en_curso
       until: en_curso.stdout | trim == "0"
-      retries: 20
-      delay: 0.5
+      retries: 15
+      delay: 1
       changed_when: false
 
   tasks:
@@ -98,8 +98,8 @@ cat > deploy.yml <<'YML'
         awk -F, '$1=="{{ haproxy_backend }}" && $2=="{{ inventory_hostname }}" {print $18}'
       register: st
       until: st.stdout | trim == "UP"
-      retries: 20
-      delay: 0.5
+      retries: 15
+      delay: 1
       changed_when: false
 YML
 ansible-playbook deploy.yml --syntax-check >/dev/null

@@ -29,13 +29,16 @@ else
   no "El bot que ataca ahora mismo no aparece baneado en la jail sshd."
 fi
 
+# El botón Validar corre este script como root: la prueba de llave tiene que
+# hacerse con las llaves de analista, no con las de root.
+COMO_ANALISTA=""; [ "$(id -u)" -eq 0 ] && COMO_ANALISTA="runuser -u analista --"
 T=$($SUDO sshd -T 2>/dev/null)
 echo "$T" | grep -qx 'passwordauthentication no' && ok "PasswordAuthentication no." || no "sshd sigue aceptando contraseñas."
 echo "$T" | grep -qx 'kbdinteractiveauthentication no' && ok "KbdInteractiveAuthentication no." || no "KbdInteractiveAuthentication sigue activo (otra vía de contraseña)."
-if ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=4 analista@127.0.0.1 true 2>/dev/null; then
+if $COMO_ANALISTA ssh -n -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=4 analista@127.0.0.1 true 2>/dev/null; then
   ok "analista entra por SSH con su llave."
 else
-  no "analista no puede entrar con llave (ssh analista@127.0.0.1): te quedarías fuera."
+  no "analista no puede entrar con llave sin pedir nada (ssh analista@127.0.0.1): te quedarías fuera. ¿La llave tiene passphrase?"
 fi
 
 echo "---------------------------------------"

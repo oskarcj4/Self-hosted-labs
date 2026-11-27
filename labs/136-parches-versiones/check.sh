@@ -10,7 +10,7 @@ val(){ grep -E "^$1=" $H/inventario.txt 2>/dev/null | head -1 | cut -d= -f2- | t
 
 echo "== Lab 136 · Parches y versiones — comprobación =="
 [ "$(val php)" = "$(php -r 'echo PHP_VERSION;')" ] && ok "Versión de PHP correcta." || no "inventario.txt: php= no es la versión exacta instalada."
-[ "$(val nginx)" = "$(nginx -v 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" ] && ok "Versión de nginx correcta." || no "inventario.txt: nginx= no es la versión exacta instalada."
+[ "$(val nginx)" = "$(/usr/sbin/nginx -v 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" ] && ok "Versión de nginx correcta." || no "inventario.txt: nginx= no es la versión exacta instalada."
 if ls /var/lib/apt/lists/*_Packages >/dev/null 2>&1 || ls /var/lib/apt/lists/*_Packages.* >/dev/null 2>&1; then
   n=$(apt list --upgradable 2>/dev/null | grep -c 'upgradable from')
   [ "$(val actualizables)" = "$n" ] && ok "Recuento de paquetes actualizables correcto ($n)." || no "inventario.txt: actualizables= no coincide con apt list --upgradable ($n ahora)."
