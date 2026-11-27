@@ -18,6 +18,10 @@ iptables -S
 # SSH 22 abierto a todos; telnet 23 y web 80 abiertos sin servicio detrás
 iptables-save | iptables-restore-translate     # equivalencia literal, de partida
 ```
+`iptables -S` lista las reglas cargadas en el formato con el que se escriben.
+`iptables-save` las vuelca todas y `iptables-restore-translate` las convierte
+a sintaxis de nftables, regla por regla: sirve para entender la equivalencia,
+pero copia también lo que sobra (telnet, web, la política ACCEPT).
 
 ## Paso 2 · Escribe `/etc/nftables.conf`
 
@@ -69,7 +73,7 @@ table inet filter {
 
 :::pista Cómo hacerlo
 ```bash
-sudo nft -c -f /etc/nftables.conf        # valida SIN aplicar
+sudo nft -c -f /etc/nftables.conf        # valida SIN aplicar (-c = check, -f = fichero)
 sudo systemctl disable --now legacy-fw.service
 sudo iptables -F; sudo iptables -P INPUT ACCEPT    # limpia lo que dejó el script viejo
 sudo systemctl enable --now nftables

@@ -30,6 +30,8 @@ El nombre/correo no identifica nada (una clave se crea en segundos). Sólo la
 instalado si algo falla?
 
 :::pista El script
+Créalo con `sudo nano /usr/local/bin/install-tool.sh`, pega esto y hazlo
+ejecutable con `sudo chmod 755 /usr/local/bin/install-tool.sh`:
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -58,6 +60,17 @@ Fija la huella del ticket en el runner:
 sudo mkdir -p /etc/kvtool
 echo "AAAA BBBB ...(la del ticket)" | sudo tee /etc/kvtool/fabricante.fpr
 ```
+Piezas menos habituales:
+
+| Pieza | Qué hace |
+|---|---|
+| `V="${1:?uso: …}"` | Toma el primer argumento; si falta, el script para con ese mensaje. |
+| `${ARTIFACTS_URL:-…}` | Usa la variable si existe; si no, el valor tras `:-`. Así el validador puede apuntarlo a mirrors manipulados. |
+| `"${PIN// /}"` | Quita todos los espacios de la huella (`//` = reemplazar todas las apariciones). |
+| `export GNUPGHOME=…` | Un llavero de gpg temporal y vacío: las claves que traiga el mirror no se mezclan con nada tuyo y desaparecen al terminar. |
+| `gpg --status-fd=1` | Además del texto para humanos, gpg escribe líneas para máquinas en el descriptor 1 (la salida normal). La línea `VALIDSIG <huella> …` dice **qué clave** firmó. |
+| `grep " $TAR\$" SHA256SUMS \| sha256sum -c -` | Se queda con la línea de `SHA256SUMS` de este fichero y la pasa a `sha256sum -c`, que recalcula el hash y lo compara. `-` = leer de la entrada. |
+
 Tres defensas, cada una aborta:
 1. **Firma + identidad**: `VALIDSIG <huella>` fijada, no "Good signature".
 2. **Integridad**: `sha256sum -c` del tar.gz (pilla un binario cambiado aunque
