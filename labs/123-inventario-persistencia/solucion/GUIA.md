@@ -15,6 +15,10 @@ systemctl list-unit-files --state=enabled --type=service
 ls -la /etc/systemd/system/
 dpkg -S /usr/lib/systemd/systemd-netlinkd    # ningún paquete
 ```
+`dpkg -S <fichero>` dice qué paquete instaló ese fichero. Un binario con
+nombre de sistema (`systemd-*`) que no pertenece a ningún paquete lo puso
+alguien a mano. Lee la unidad para ver qué ejecuta: `systemctl cat
+systemd-netlinkd`.
 :::
 
 ## Paso 2 · Cron de usuarios y de sistema
@@ -24,7 +28,11 @@ dpkg -S /usr/lib/systemd/systemd-netlinkd    # ningún paquete
 for u in $(cut -d: -f1 /etc/passwd); do sudo crontab -l -u $u 2>/dev/null | sed "s/^/$u: /"; done
 ls -la /etc/cron.d/; cat /etc/cron.d/*
 ```
-`www-data` no debería tener crontab.
+`crontab -l -u <usuario>` muestra el cron de cada usuario; el bucle recorre
+todos los de `/etc/passwd` (`cut -d: -f1` toma el primer campo, el nombre) y
+`sed` antepone el nombre a cada línea. Los cron de usuario no están en
+`/etc/cron.d/`: viven aparte, por eso hay que preguntar uno a uno.
+`www-data` (el usuario del servidor web) no debería tener crontab.
 :::
 
 ## Paso 3 · Ficheros de inicio de sesión
@@ -36,6 +44,9 @@ ls -la /etc/cron.d/; cat /etc/cron.d/*
 sudo grep -n base64 /home/*/.bashrc /root/.bashrc
 echo '<cadena>' | base64 -d          # decodifica, NO lo ejecutes
 ```
+Una línea tipo `eval "$(echo … | base64 -d)"` ejecuta, en cada sesión, un
+comando escondido en base64. `base64 -d` lo descodifica y lo muestra; sin
+`eval` ni `| sh`, no se ejecuta.
 :::
 
 ## Paso 4 · Llaves SSH
@@ -52,8 +63,19 @@ Una llave con comentario `backup@infra` que nadie reconoce.
 **Pregúntate:** ¿qué datos sirven para buscar lo mismo en otros servidores? Rutas, dominios, comentarios de llave.
 
 :::pista Cómo hacerlo
+Primero documenta: en `~/iocs.txt` una línea por punto de persistencia (la
+unidad, el crontab de `www-data`, el fichero de `/etc/cron.d/`, el `.bashrc`
+de `deploy`, la llave de `authorized_keys`) y los dominios que aparecen
+(`cdn-update.example.net`, y el que sale al descodificar el base64).
 ```bash
 nano ~/iocs.txt
+```
+Después guarda copia de lo que vas a borrar y limpia:
+```bash
+sudo mkdir -p /root/evidencia
+sudo cp -a /etc/systemd/system/systemd-netlinkd.service /usr/lib/systemd/systemd-netlinkd \
+  /etc/cron.d/apt-compat-check /var/lib/apt/.cache/update /root/evidencia/
+sudo crontab -l -u www-data | sudo tee /root/evidencia/crontab-www-data >/dev/null
 sudo systemctl disable --now systemd-netlinkd.service
 sudo rm -f /etc/systemd/system/systemd-netlinkd.service /usr/lib/systemd/systemd-netlinkd
 sudo systemctl daemon-reload

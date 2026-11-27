@@ -50,6 +50,9 @@ networks:
 ```bash
 docker compose up -d --remove-orphans
 ```
+`up -d` recrea los contenedores en sus redes nuevas; `--remove-orphans` borra
+los contenedores del proyecto que ya no están en el fichero. Compose crea las
+redes con el prefijo del proyecto (`store_frontend`, `store_backend`).
 :::
 
 ## Paso 4 · Verifica el aislamiento y la cadena
@@ -59,6 +62,11 @@ docker compose up -d --remove-orphans
 ```bash
 docker compose exec web python -c "import socket;socket.create_connection(('db',5432),timeout=2)" || echo "web aislado de db"
 curl -s localhost:8080
+```
+**Qué deberías ver:** un error de nombre (`Name or service not known`: `web` ni
+siquiera sabe qué es `db`), `web aislado de db`, y la cadena completa
+`web ok -> api ok -> db PONG`.
+```bash
 bash /opt/lab/check.sh
 ```
 

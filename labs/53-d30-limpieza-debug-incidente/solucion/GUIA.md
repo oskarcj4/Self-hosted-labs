@@ -62,6 +62,11 @@ timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/7000' && echo ABIERTO || echo "700
 bash /opt/lab/check.sh
 ```
 
+`timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/7000'` intenta abrir una
+conexión TCP con un truco de bash: `/dev/tcp/<host>/<puerto>` no existe en
+disco, bash lo interpreta como "conéctate ahí". Si nadie escucha, falla. Es
+útil cuando no hay `nc` ni `curl` a mano.
+
 ## Cómo actuar en una situación así
 
 - **Cada cambio de emergencia: dueño, ticket y fecha de retirada.**

@@ -16,6 +16,13 @@ docker compose config
 for s in web worker reporter upstream; do echo "== $s"; docker compose exec $s ls /run/secrets 2>&1; done
 ```
 Fíjate en qué bloque está `secrets:` en el YAML original: si está en el anclaje común, lo hereda todo el que lo use.
+
+Cómo funciona el anclaje: `x-app: &app` pone nombre (`app`) a un bloque; en
+cada servicio, `<<: *app` **fusiona** ese bloque con lo que el servicio
+declare. Las claves que el servicio no redefine se heredan tal cual, incluido
+`secrets:`. `docker compose config` enseña el resultado ya fusionado.
+
+**Qué deberías ver:** `/run/secrets/api_token` en los cuatro servicios.
 :::
 
 ## Paso 2 · ¿Quién lo usa?
