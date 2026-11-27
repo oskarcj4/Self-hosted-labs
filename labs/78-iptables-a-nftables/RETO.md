@@ -31,14 +31,14 @@ cargado por `nftables.service`:
 
 ```bash
 cat /etc/firewall/rules-legacy.sh        # lo que hay que traducir
-iptables -S                              # reglas cargadas ahora mismo
-nft list ruleset                         # lo que ve nftables
+sudo iptables -S                              # reglas cargadas ahora mismo
+sudo nft list ruleset                         # lo que ve nftables
 # traducción automática (buen punto de partida, NO el resultado final):
-iptables-save | iptables-restore-translate
+sudo iptables-save | sudo iptables-restore-translate
 man nft    # busca: set, interval, ct state, limit rate, policy
-nft -c -f /etc/nftables.conf             # valida SIN aplicar
-systemctl disable --now legacy-fw.service
-systemctl enable --now nftables
+sudo nft -c -f /etc/nftables.conf             # valida SIN aplicar
+sudo systemctl disable --now legacy-fw.service
+sudo systemctl enable --now nftables
 ```
 
 Pista: la política `drop` sólo deja pasar lo que aceptes explícitamente;

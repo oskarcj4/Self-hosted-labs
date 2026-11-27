@@ -13,10 +13,10 @@ partida; el set `admin_nets` y el SSH acotado se escriben a mano.
 
 ```bash
 cat /etc/firewall/rules-legacy.sh
-iptables -S
+sudo iptables -S
 # -P INPUT ACCEPT  (al revés de lo que se quiere)
 # SSH 22 abierto a todos; telnet 23 y web 80 abiertos sin servicio detrás
-iptables-save | iptables-restore-translate     # equivalencia literal, de partida
+sudo iptables-save | sudo iptables-restore-translate     # equivalencia literal, de partida
 ```
 `iptables -S` lista las reglas cargadas en el formato con el que se escriben.
 `iptables-save` las vuelca todas y `iptables-restore-translate` las convierte
@@ -77,7 +77,7 @@ sudo nft -c -f /etc/nftables.conf        # valida SIN aplicar (-c = check, -f = 
 sudo systemctl disable --now legacy-fw.service
 sudo iptables -F; sudo iptables -P INPUT ACCEPT    # limpia lo que dejó el script viejo
 sudo systemctl enable --now nftables
-nft list ruleset
+sudo nft list ruleset
 bash /opt/lab/check.sh
 ```
 Valida → quita el servicio viejo (que no reaparezca al reiniciar) → limpia las

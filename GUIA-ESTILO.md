@@ -91,6 +91,20 @@ levantado antes de publicarlo. Errores que ya nos han pasado:
   servicio.
 - Bloques comentados "de ejemplo" en una config que, al descomentarlos,
   duplican una sección y rompen `nginx -t`.
+- Comandos de `/usr/sbin` (`nginx`, `iptables`, `nft`, `losetup`…) escritos
+  sin `sudo` ni ruta completa: `/usr/sbin` no está en el `PATH` de `analista`
+  y dan `command not found`.
+- Leer ficheros de root (`/etc/restic/pass`, `/proc/<PID>/environ` de otro
+  usuario, `/var/log/apache2/`) sin `sudo`. Y ojo: `sudo` no pasa tus
+  variables de entorno al comando; usa `sudo env VAR=valor comando`.
+- Un `check.sh` que sólo funciona con un usuario: el botón **Validar** lo
+  ejecuta como root, y la terminal como `analista`. Pruébalo de las dos formas.
+- Fragmentos con `# ...` o `curl ...` en lugar del fichero completo (workflows,
+  Dockerfiles, compose, scripts): si el alumno lo copia, no funciona.
+- Pasos que el reto exige y la guía nunca dice cómo hacer (escribir el fichero
+  de respuestas, hacer `git push`, `terraform apply`).
+- Afirmaciones sobre el orden en que aparecen los errores que no coinciden con
+  el log real. Si la guía enseña a seguir el log, tiene que seguirlo.
 
 ## Qué no hacer
 

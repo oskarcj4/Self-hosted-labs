@@ -14,7 +14,7 @@ ejecutar nada.
 ```bash
 lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
 df -h /datos
-losetup -a
+sudo losetup -a
 ```
 El disco (`loopN`) mide 800M; la partición (`loopNp1`) sigue en ~300M.
 :::
