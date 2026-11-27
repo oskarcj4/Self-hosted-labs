@@ -1,61 +1,91 @@
 # Resolución guiada · Lab 144
 
-:::piensa ¿Qué es "real"?
-No cuentes alertas: léelas. Pregunta por cada una: ¿esto cambia lo que hago
-esta noche? Un health check nunca. Un acceso externo con éxito, siempre.
+:::piensa ¿Esto cambia lo que hago esta noche?
+Un SOC no se ahoga por falta de alertas, sino por exceso. Triar es hacerse una
+pregunta con cada una: ¿cambia lo que hago esta noche? Un health check, nunca.
+Un acceso externo seguido de una webshell, siempre. Y silenciar lo que nunca
+es accionable no es taparse los ojos: es lo que permite ver lo que sí lo es.
 :::
 
-## Paso 1 · Mira la forma del ruido
+**El plan:** (1) ver la forma del ruido, (2) encontrar la cadena de ataque,
+(3) no confundir el escáner autorizado, y (4) escribir el triage y silenciar.
 
-:::pista Cómo comprobarlo
+## Paso 1 · La forma del ruido
+
+:::pista Cómo hacerlo
 ```bash
 soc-stats
+jq -r .regla /var/log/soc/alertas.jsonl | sort | uniq -c | sort -rn | head
 ```
-La regla que más dispara y con nivel bajo (`healthcheck_http`) es ruido puro.
+- `soc-stats` es un comando del lab que resume las alertas por regla y nivel.
+- El fichero es **JSON Lines**: un objeto JSON por línea. `jq -r .regla`
+  saca el campo `regla` de cada uno, en texto plano (`-r`); `sort | uniq -c |
+  sort -rn` cuenta cuántas hay de cada una.
+
+**Qué deberías ver:** `healthcheck_http` con cientos de disparos y nivel
+bajo. Nunca lleva a ninguna acción: es ruido.
 :::
 
-## Paso 2 · Encuentra la cadena
+## Paso 2 · La cadena de ataque
 
-**Pregúntate:** ¿hay un origen que aparece en varias alertas de nivel alto?
+**Pregúntate:** ¿hay un mismo origen detrás de varias alertas graves?
 
-:::pista Cómo comprobarlo
+:::pista Cómo hacerlo
 ```bash
 jq -c 'select(.nivel>=10)' /var/log/soc/alertas.jsonl
 jq -r 'select(.nivel>=10).src_ip' /var/log/soc/alertas.jsonl | sort -u
 ```
-Todas salen de `203.0.113.7`: acceso → webshell → escalada. Esa es la historia.
+`select(condición)` deja pasar sólo los objetos que la cumplen; `-c` imprime
+cada uno en una línea.
+
+**Qué deberías ver:** tres alertas, todas desde `203.0.113.7`, en orden:
+acceso → webshell → escalada de privilegios. Eso es una historia, no tres
+alertas sueltas.
 :::
 
-## Paso 3 · No te comas un falso negativo
+## Paso 3 · El escáner autorizado
 
-:::pista Ojo con el escáner
-`vuln_scan` desde `10.0.5.5` es nivel 4 y dice "ventana aprobada CHG-2271".
-Es el equipo de pentest: se vigila, no se escala, y **no se silencia** (si un
-día viene de otra IP, quieres verlo).
+:::pista Qué mirar
+```bash
+jq -c 'select(.regla=="vuln_scan")' /var/log/soc/alertas.jsonl | head -3
+```
+`vuln_scan` desde `10.0.5.5` dice "ventana aprobada CHG-2271": es el equipo de
+pentest. No es un incidente, pero **tampoco se silencia**: si un día ese
+patrón viene de otra IP o fuera de la ventana, quieres verlo.
 :::
 
-## Paso 4 · Escribe el triage y silencia el ruido
+## Paso 4 · El triage y la supresión
 
 :::pista Cómo hacerlo
 ```bash
 jq -r 'select(.nivel>=10).id' /var/log/soc/alertas.jsonl | sort | paste -sd,
+```
+`paste -sd,` une todas las líneas en una, separadas por comas.
+```bash
 cat > ~/triage.txt <<'T'
 ip_atacante=203.0.113.7
-alertas_reales=7031,7032,7033
+alertas_reales=<los ids que acaba de imprimir>
 regla_ruidosa=healthcheck_http
 T
 sudo tee -a /etc/soc/supresiones.txt <<<'healthcheck_http'
+bash /opt/lab/check.sh
 ```
+`<<<'texto'` (*here-string*) pasa ese texto como entrada del comando. `tee -a`
+lo añade al final del fichero sin borrar lo que hubiera.
 :::
 
 ## Cómo actuar en una situación así
 
-- El triage es decidir, no clasificar por gusto: cada alerta accionable lleva
-  una acción; cada regla ruidosa, una justificación para bajarla.
-- Mide tu ratio señal/ruido: si el 90% nunca se acciona, el SOC no escala.
+- Cada alerta accionable lleva una acción; cada regla que se baja, una
+  justificación escrita.
+- Mide el ratio señal/ruido: si el 90 % de las alertas nunca se acciona, el
+  SOC no escala.
+- Ante una cadena así: aislar el servidor, bloquear la IP y empezar la
+  respuesta a incidentes, no sólo "cerrar la alerta".
 
 ## Si te atascas
 
-- `alertas_reales` no cuadra: usa exactamente los ids que da
-  `jq -r 'select(.nivel>=10).id'`, ordenados.
-- No pongas `vuln_scan` en supresiones: el validador lo marca como error.
+- **`alertas_reales` no cuadra:** usa exactamente los ids de
+  `select(.nivel>=10)`.
+- **El check marca error en las supresiones:** no pongas `vuln_scan` ni
+  ninguna de las reglas de la cadena.

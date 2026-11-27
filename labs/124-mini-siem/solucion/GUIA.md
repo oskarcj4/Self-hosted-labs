@@ -46,7 +46,21 @@ groups:
         labels: {severity: high, kill_chain: explotacion}
         annotations: {summary: "Fuerza bruta SSH contra {{ $labels.host }}"}
 ```
+
+| Pieza | Qué hace |
+|---|---|
+| `{job="auth"}` | Selecciona las líneas de log con esa etiqueta (las de `auth.log`). |
+| `\|= "texto"` | Se queda con las líneas que **contienen** ese texto. `\|~ "regex"` hace lo mismo con una expresión regular. |
+| `count_over_time(… [5m])` | Convierte las líneas en un número: cuántas hubo en los últimos 5 minutos. |
+| `sum by (host) (…)` | Suma por máquina: una serie (y una alerta) por cada `host`. |
+| `> 10` | La condición: la alerta se dispara cuando el valor la supera. |
+| `for: 0m` | Cuánto tiempo tiene que cumplirse antes de pasar a `firing`. |
+| `labels.kill_chain` | La fase de la Kill Chain; ordena la cola del N1. |
+| `{{ $labels.host }}` | Se sustituye por el host de la serie que disparó. |
+
 Guárdala en `/etc/siem/reglas/deteccion.yml`. Loki recarga las reglas solo.
+Prueba la `expr` antes como consulta (`logcli instant-query '…'`): si da un
+número por encima del umbral, la regla disparará.
 :::
 
 ## Paso 4 · Cubre la Kill Chain
