@@ -27,25 +27,59 @@ terraform force-unlock <ID>
 ## Paso 2 · Drift
 
 :::pista Qué mirar
-`terraform plan -refresh-only`: réplicas 2→4 y el `index.html` cambiado.
-Como el código es la verdad, `terraform apply` lo devuelve a su sitio.
+```bash
+terraform plan -refresh-only
+terraform apply
+```
+`-refresh-only` compara el estado guardado con lo que hay de verdad en el
+clúster, sin proponer cambios: es la forma de **ver** el *drift* (lo que
+alguien cambió a mano). **Qué deberías ver:** réplicas 2→4 y el `index.html`
+cambiado. Como el código es la verdad, un `apply` normal lo devuelve a su
+sitio (pide confirmar con `yes`).
 :::
 
 ## Paso 3 · Import
 
 :::pista Cómo hacerlo
+Primero mira los valores reales de la cuota que existe en el clúster y que
+Terraform no gestiona:
+```bash
+kubectl -n tienda get resourcequota cuota-tienda -o yaml
+```
+Escribe el recurso con **esos** valores y un bloque `import`:
 ```hcl
 resource "kubernetes_resource_quota_v1" "tienda" {
-  metadata { name = "cuota-tienda"  namespace = "tienda" }
-  spec { hard = { pods = "20", "requests.cpu" = "2", "requests.memory" = "2Gi" } }
+  metadata {
+    name      = "cuota-tienda"
+    namespace = "tienda"
+  }
+  spec {
+    hard = {
+      pods              = "20"
+      "requests.cpu"    = "2"
+      "requests.memory" = "2Gi"
+    }
+  }
 }
+
 import {
   to = kubernetes_resource_quota_v1.tienda
   id = "tienda/cuota-tienda"
 }
 ```
-(Pon `metadata` en varias líneas en HCL real.) Tras `apply`, el bloque `import`
-puede quedarse o borrarse.
+```bash
+terraform plan
+terraform apply
+terraform plan
+```
+- El bloque `import` le dice a Terraform: "este recurso ya existe; apúntalo en
+  el estado con esta dirección". El `id` lo define cada proveedor; para el de
+  Kubernetes es `namespace/nombre`.
+- **Qué deberías ver:** en el primer plan, `1 to import, 0 to add, 0 to
+  change`; y el último, `No changes`. Si propone cambios, tus valores no
+  coinciden con los reales.
+
+Después del `apply`, el bloque `import` puede quedarse o borrarse.
 :::
 
 ## Cómo actuar en una situación así
