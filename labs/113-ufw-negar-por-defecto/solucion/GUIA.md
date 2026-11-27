@@ -26,6 +26,21 @@ sudo ufw status verbose
 `cat /srv/escaneo/ultimo.txt` (ticket en `~/ticket/AUDIT-113.txt`). Se actualiza cada 15 s.
 :::
 
+## Paso 2b · Limpia las reglas heredadas
+
+:::pista Cómo hacerlo
+```bash
+sudo ufw status numbered
+sudo ufw delete <N>        # repite para cada regla sobrante, empezando por la más alta
+```
+`status numbered` numera las reglas guardadas (aunque ufw esté inactivo).
+Borra desde el número más alto: al borrar una, las siguientes se renumeran.
+Para empezar de cero también vale `sudo ufw --force reset`, que borra todas las
+reglas y desactiva ufw (`--force` no pide confirmación).
+
+**Qué deberías ver:** sin los `allow` de 3306, 6379 y 8080.
+:::
+
 ## Paso 3 · Política y excepciones
 
 **Pregúntate:** ¿en qué orden pones las reglas para no cortarte el acceso?
@@ -40,6 +55,11 @@ sudo ufw allow 443/tcp
 sudo ufw enable
 sudo ufw status numbered
 ```
+- `default deny incoming`: lo que no esté permitido explícitamente, se
+  descarta. `default allow outgoing`: el servidor puede salir.
+- `allow OpenSSH` usa el perfil de aplicación de SSH (puerto 22); va **antes**
+  del `enable`: en un servidor remoto, activar sin él te deja fuera.
+- `ufw enable` activa el firewall y lo deja activo tras reiniciar.
 :::
 
 ## Paso 4 · Confirma desde fuera
