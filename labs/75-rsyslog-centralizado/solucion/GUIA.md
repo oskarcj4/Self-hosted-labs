@@ -40,6 +40,10 @@ ss -ltn | grep 514
 - El **ruleset** aísla la entrada remota: no pasa por las reglas por defecto
   que escriben `/var/log/syslog`. El `stop` lo blinda.
 - `dynaFile` + plantilla = un fichero por máquina y programa, sin reglas a mano.
+  `%HOSTNAME%` y `%PROGRAMNAME%` se sustituyen, en cada mensaje, por la máquina
+  que lo envió y el programa que lo escribió; `createDirs="on"` crea las
+  carpetas que falten.
+- `rsyslogd -N1` comprueba la configuración (nivel 1) sin arrancar nada.
 - Producción: TLS (`gtls`) y restringe emisores (`$AllowedSender`/firewall).
 :::
 
@@ -78,6 +82,15 @@ sudo systemctl start rsyslog
 sudo grep -o 'pedido=[0-9]*' /var/log/remote/web-02/pagos-web.log | tail -30   # sin saltos
 bash /opt/lab/check.sh
 ```
+- Se para también `syslog.socket`: en Debian, systemd escucha en el socket de
+  syslog y, si algo escribe un log, vuelve a arrancar rsyslog solo. Para
+  simular una caída de verdad hay que parar los dos.
+- `grep -o 'pedido=[0-9]*'` imprime sólo el trozo que coincide (`-o`), no la
+  línea entera: verás `pedido=101`, `pedido=102`…
+
+**Qué deberías ver:** una secuencia de números sin saltos. Los mensajes de los
+20 s de caída se quedaron en la cola en disco de `web-02` y llegaron al
+volver el colector.
 
 ## Cómo actuar en una situación así
 

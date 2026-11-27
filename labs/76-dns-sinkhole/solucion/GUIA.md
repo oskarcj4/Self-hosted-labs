@@ -43,6 +43,15 @@ wc -l /tmp/bloquear.txt
 ```
 dnsmasq perdona `\r` y mayúsculas, pero `grep -x`/`sort -u` **no**: normaliza
 primero o bloquearás `localhost` y el falso positivo de la allowlist.
+
+| Pieza | Qué hace |
+|---|---|
+| `tr -d '\r'` | Borra los retornos de carro de Windows (`^M` en `cat -A`). Sin esto, `malsrv.top` y `malsrv.top\r` son textos distintos. |
+| `sed 's/#.*//'` | Quita los comentarios: desde `#` hasta el final de la línea. |
+| `awk 'NF >= 2 {print tolower($2)}'` | El feed tiene formato de `/etc/hosts` (`IP dominio`). Se queda con las líneas de al menos 2 campos e imprime el segundo, el dominio, en minúsculas. |
+| `grep -vxE 'localhost\|0\.0\.0\.0'` | Quita las entradas de cabecera. `-v` invierte (lo que **no** coincide), `-x` exige coincidir con la línea entera, `-E` permite el `\|` ("o"). |
+| `grep -vxFf <(…allowlist…)` | Quita los dominios de la allowlist. `-f` lee los patrones de un fichero; `-F` los trata como texto literal, no como expresiones. `<(…)` pasa la salida de un comando como si fuera un fichero, sin comentarios ni líneas vacías. |
+| `sort -u` | Ordena y quita duplicados. |
 :::
 
 ## Paso 3 · El sinkhole (cubre subdominios)
@@ -59,18 +68,27 @@ dig @127.0.0.1 +short analytics.proveedor.example   # resuelve (allowlist)
 ```
 `address=/dominio/0.0.0.0` cubre el dominio **y todos sus subdominios** — un
 `/etc/hosts` no podría (sólo nombres exactos). Sin IP → NXDOMAIN.
+`sed 's|.*|address=/&/0.0.0.0|'` convierte cada línea en una directiva: `&` es
+"todo lo que encajó", es decir, el dominio. Usa `|` como separador porque el
+texto ya lleva `/`. `dig @127.0.0.1 +short` pregunta a tu dnsmasq e imprime sólo
+la respuesta.
 :::
 
 ## Paso 4 · ¿Quién es? (`~/infectado.txt`)
 
 :::pista Cómo hallarlo
 ```bash
-awk '/query\[/ && $NF != "127.0.0.1" {print $(NF-2), $NF}' /var/log/dnsmasq.log | sort -u \
+sudo awk '/query\[/ && $NF != "127.0.0.1" {print $(NF-2), $NF}' /var/log/dnsmasq.log | sort -u \
   | while read -r d ip; do
       [ "$(dig +short @127.0.0.1 "$d" | tail -1)" = 0.0.0.0 ] && echo "$ip $d"
     done | sort -u
 echo 10.76.76.22 > ~/infectado.txt
 ```
+`awk` toma las líneas `query[` (preguntas recibidas), salvo las tuyas
+(`127.0.0.1`), e imprime el dominio (`$(NF-2)`, antepenúltimo campo) y la IP
+que pregunta (`$NF`, último). El bucle `while read` pregunta cada dominio a tu
+DNS y se queda con los que ahora dan `0.0.0.0`: esos son los bloqueados.
+
 Trampas: `10.76.76.21` pregunta por `analytics.proveedor.example` (falso
 positivo de la allowlist, no infectado); `127.0.0.1` eres tú con `dig`.
 :::

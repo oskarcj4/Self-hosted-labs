@@ -17,6 +17,9 @@ delante para teclearla.
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N '' -C 'analista@dev-01 pipeline'
 ls -l ~/.ssh/      # id_ed25519 (600), id_ed25519.pub (644)
 ```
+`-t ed25519` es el tipo de clave (moderno y corto); `-f` dónde guardarla;
+`-N ''` passphrase vacía; `-C` un comentario que acaba al final de la clave
+pública: sirve para saber de quién es cuando la veas en un `authorized_keys`.
 :::
 
 ## Paso 2 · Configura el cliente (el salto, una vez)
@@ -48,6 +51,11 @@ bastión puede usar tu agente).
 
 ## Paso 3 · Instala la pública en ambos
 
+`ssh-copy-id` entra con contraseña y añade tu clave **pública** al
+`~/.ssh/authorized_keys` del otro lado. Como usa tu `~/.ssh/config`, basta con
+el alias. La primera vez en cada máquina te pregunta si confías en su huella:
+responde `yes`.
+
 ```bash
 ssh-copy-id bastion     # contraseña del ticket (una vez)
 ssh-copy-id app-02      # el salto ya va con clave; pide la de app-02
@@ -64,6 +72,7 @@ home, `~/.ssh` o el fichero son escribibles por grupo/otros.
 :::pista Cómo verlo y arreglarlo
 ```bash
 ssh -v app-02 2>&1 | grep -iE 'offering|authentications that can continue'
+# -v: modo detallado; 2>&1 porque ssh escribe ese detalle en la salida de errores
 # Offering public key ...  /  Authentications that can continue: publickey,password  (la rechazó)
 
 ssh app-02 'ls -ld ~ ~/.ssh ~/.ssh/authorized_keys'
