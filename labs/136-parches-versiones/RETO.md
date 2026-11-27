@@ -13,7 +13,7 @@ Tres capas que se parchean por separado:
 
 | Capa | Cómo ver qué hay | Cómo ver qué falta |
 |---|---|---|
-| Sistema (Debian) | `dpkg -l`, `nginx -v`, `php -v` | `apt update && apt list --upgradable` |
+| Sistema (Debian) | `dpkg -l`, `/usr/sbin/nginx -v`, `php -v` | `apt update && apt list --upgradable` |
 | Dependencias de la app | `composer.lock`, `package-lock.json` | `trivy fs <dir>` |
 | Imagen de contenedor | la imagen | `trivy image <imagen>` (en tu CI, con Docker) |
 
@@ -30,7 +30,7 @@ Tres capas que se parchean por separado:
 
 ```bash
 curl -I http://127.0.0.1/ ; curl -s http://127.0.0.1/info.php | head
-php -v ; nginx -v ; php -r 'echo PHP_VERSION;'
+php -v ; /usr/sbin/nginx -v ; php -r 'echo PHP_VERSION;'   # nginx está en /usr/sbin, fuera de tu PATH
 sudo apt update ; apt list --upgradable
 trivy fs /srv/app
 trivy fs --format json -o ~/trivy-app.json /srv/app
